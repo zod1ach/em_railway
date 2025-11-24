@@ -19,7 +19,7 @@ class Config:
     SESSION_USE_SIGNER = True
     SESSION_KEY_PREFIX = 'emcalc:'
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
-    SESSION_REDIS = redis.from_url(REDIS_URL, decode_responses=True)
+    SESSION_REDIS = None  # Will be set in init_app
 
     # Celery
     CELERY_BROKER_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
@@ -46,6 +46,11 @@ class Config:
         # Ensure temp and session folders exist
         os.makedirs(Config.TEMP_FOLDER, exist_ok=True)
         os.makedirs(Config.SESSION_FOLDER, exist_ok=True)
+
+        # Initialize Redis connection for sessions
+        redis_url = app.config.get('REDIS_URL')
+        if redis_url:
+            app.config['SESSION_REDIS'] = redis.from_url(redis_url, decode_responses=True)
 
 
 class DevelopmentConfig(Config):
