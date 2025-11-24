@@ -18,6 +18,13 @@ def create_app(config_name='default'):
 
     # Load configuration
     app.config.from_object(config[config_name])
+
+    # Initialize Redis for sessions BEFORE calling init_app
+    import redis
+    redis_url = app.config.get('REDIS_URL')
+    if redis_url:
+        app.config['SESSION_REDIS'] = redis.from_url(redis_url, decode_responses=True)
+
     config[config_name].init_app(app)
 
     # Initialize Flask-Session
