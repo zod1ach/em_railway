@@ -1,0 +1,37 @@
+# Web Framework
+Flask==3.0.0
+Flask-Session==0.5.0
+Werkzeug==3.0.1
+
+# WSGI Server
+gunicorn==21.2.0
+
+# Background Tasks
+celery==5.3.4
+redis==5.0.1
+
+# Scientific Computing
+numpy==1.26.2
+scipy==1.11.4
+
+# Plotting
+matplotlib==3.8.2
+
+# Geomagnetic Model
+pygeomag==0.1.0
+
+# Maps and Geometry
+folium==0.15.1
+shapely==2.0.2
+
+# Data Processing (for WMM - but NO xarray/netCDF4 for GEBCO)
+python-dateutil==2.8.2
+
+# Optional: For Plotly if needed later
+# plotly==5.18.0
+
+# Optional: For 3D Cable advanced features
+# cartopy==0.22.0  # Only if needed for coordinate transformations
+
+# Utilities
+tqdm==4.66.1

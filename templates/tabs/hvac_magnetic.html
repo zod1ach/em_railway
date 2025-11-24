@@ -1,0 +1,256 @@
+<div class="row">
+    <!-- Left Panel: Input Forms -->
+    <div class="col-md-4">
+        <div class="scrollable-panel">
+            <form id="hvac-mag-form">
+                <!-- Geometry Group -->
+                <div class="input-group-box">
+                    <div class="input-group-title">Geometry</div>
+
+                    <div class="mb-3">
+                        <label for="mag_p_c" class="form-label">Power Core Lay Length [m]</label>
+                        <input type="number" class="form-control" id="mag_p_c" name="p_c"
+                               value="2.750" step="0.001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_R_h" class="form-label">Radius of Helix [m]</label>
+                        <input type="number" class="form-control" id="mag_R_h" name="R_h"
+                               value="0.060391" step="0.000001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_r_AC" class="form-label">Cable Radius [m]</label>
+                        <input type="number" class="form-control" id="mag_r_AC" name="r_AC"
+                               value="0.1225" step="0.0001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_d_s" class="form-label">Sheath Diameter [m]</label>
+                        <input type="number" class="form-control" id="mag_d_s" name="d_s"
+                               value="0.0958" step="0.0001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_s" class="form-label">Distance Between Conductors [m]</label>
+                        <input type="number" class="form-control" id="mag_s" name="s"
+                               value="0.0892" step="0.0001" required>
+                    </div>
+                </div>
+
+                <!-- Armour Group -->
+                <div class="input-group-box">
+                    <div class="input-group-title">Armour</div>
+
+                    <div class="mb-3">
+                        <label for="mag_N" class="form-label">Number of Armour Wires</label>
+                        <input type="number" class="form-control" id="mag_N" name="N"
+                               value="110" step="1" min="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_d_f" class="form-label">Armour Wire Diameter [m]</label>
+                        <input type="number" class="form-control" id="mag_d_f" name="d_f"
+                               value="0.0056" step="0.0001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_d_A" class="form-label">Armour Mean Diameter [m]</label>
+                        <input type="number" class="form-control" id="mag_d_A" name="d_A"
+                               value="0.2056" step="0.0001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_p_A" class="form-label">Armour Pitch Length [m]</label>
+                        <input type="number" class="form-control" id="mag_p_A" name="p_A"
+                               value="3.084" step="0.001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_lay_factor" class="form-label">Lay Factor</label>
+                        <input type="number" class="form-control" id="mag_lay_factor" name="lay_factor"
+                               value="-1" step="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_t" class="form-label">Wire Thickness [m]</label>
+                        <input type="number" class="form-control" id="mag_t" name="t"
+                               value="0.005" step="0.001" required>
+                    </div>
+                </div>
+
+                <!-- Materials Group -->
+                <div class="input-group-box">
+                    <div class="input-group-title">Materials</div>
+
+                    <div class="mb-3">
+                        <label for="mag_R_s" class="form-label">Sheath Resistance [Ω/m]</label>
+                        <input type="number" class="form-control" id="mag_R_s" name="R_s"
+                               value="2.39815e-4" step="1e-7" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_mu_r_real" class="form-label">Relative Permeability (Real)</label>
+                        <input type="number" class="form-control" id="mag_mu_r_real" name="mu_r_real"
+                               value="100" step="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_mu_r_imag" class="form-label">Relative Permeability (Imag)</label>
+                        <input type="number" class="form-control" id="mag_mu_r_imag" name="mu_r_imag"
+                               value="-50" step="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_sigma" class="form-label">Conductivity [S/m]</label>
+                        <input type="number" class="form-control" id="mag_sigma" name="sigma"
+                               value="4.03e6" step="1e4" required>
+                    </div>
+                </div>
+
+                <!-- Electric Parameters Group -->
+                <div class="input-group-box">
+                    <div class="input-group-title">Electric Parameters</div>
+
+                    <div class="mb-3">
+                        <label for="mag_f" class="form-label">Frequency [Hz]</label>
+                        <input type="number" class="form-control" id="mag_f" name="f"
+                               value="50" step="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mag_I_AC" class="form-label">AC Current [A]</label>
+                        <input type="number" class="form-control" id="mag_I_AC" name="I_AC"
+                               value="1000" step="10" required>
+                    </div>
+                </div>
+
+                <!-- Calculation Parameters Group -->
+                <div class="input-group-box">
+                    <div class="input-group-title">Calculation Parameters</div>
+
+                    <div class="mb-3">
+                        <label for="mag_N_calc" class="form-label">Number of Terms (N_calc)</label>
+                        <input type="number" class="form-control" id="mag_N_calc" name="N_calc"
+                               value="10" min="1" max="100" step="1" required>
+                        <small class="text-muted">Higher values = more accurate but slower</small>
+                    </div>
+                </div>
+
+                <!-- Calculate Button -->
+                <button type="submit" class="btn btn-primary w-100">
+                    <span class="spinner-border spinner-border-sm d-none" id="hvac-mag-spinner"></span>
+                    <span id="hvac-mag-btn-text">Calculate Fields</span>
+                </button>
+
+                <!-- Export Buttons -->
+                <div class="mt-3">
+                    <button type="button" class="btn btn-outline-secondary w-100 mb-2" id="hvac-mag-export-csv">
+                        Export Data (CSV)
+                    </button>
+                </div>
+            </form>
+
+            <!-- Results Display -->
+            <div id="hvac-mag-results" class="mt-3" style="display: none;">
+                <div class="input-group-box">
+                    <div class="input-group-title">Results</div>
+                    <div id="hvac-mag-results-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Plots -->
+    <div class="col-md-8">
+        <div id="hvac-mag-plots">
+            <div class="plot-container">
+                <div class="plot-placeholder">
+                    <i class="bi bi-graph-up" style="font-size: 48px; color: #14ffec;"></i>
+                    <p class="mt-3">Enter parameters and click "Calculate Fields" to generate plots</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#hvac-mag-form').on('submit', function(e) {
+        e.preventDefault();
+
+        // Show loading
+        $('#hvac-mag-spinner').removeClass('d-none');
+        $('#hvac-mag-btn-text').text('Calculating...');
+        $('#hvac-mag-plots').html('<div class="plot-container"><div class="spinner-border" role="status"></div><p class="mt-3">Calculating fields with magnetic armour... This may take 30-60 seconds for high resolution (800x800)...</p></div>');
+
+        // Get form data
+        const formData = {};
+        $(this).serializeArray().forEach(item => {
+            formData[item.name] = item.value;
+        });
+
+        // Send AJAX request
+        $.ajax({
+            url: '/hvac-mag/calculate',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Display plots
+                    let plotsHTML = '';
+
+                    if (response.plots.magnetic_surface) {
+                        plotsHTML += `
+                            <div class="plot-container mb-3">
+                                <h5 class="text-center" style="color: #14ffec;">Magnetic Field - Surface</h5>
+                                <img src="${response.plots.magnetic_surface}" class="img-fluid" alt="Magnetic Field Surface">
+                            </div>
+                        `;
+                    }
+
+                    if (response.plots.electric_surface) {
+                        plotsHTML += `
+                            <div class="plot-container mb-3">
+                                <h5 class="text-center" style="color: #14ffec;">Electric Field - Surface</h5>
+                                <img src="${response.plots.electric_surface}" class="img-fluid" alt="Electric Field Surface">
+                            </div>
+                        `;
+                    }
+
+                    $('#hvac-mag-plots').html(plotsHTML);
+
+                    // Display results
+                    const resultsHTML = `
+                        <p><strong>Maximum Magnetic Field:</strong> ${response.results.max_bfield.toFixed(4)} µT</p>
+                        <p><strong>Minimum Magnetic Field:</strong> ${response.results.min_bfield.toFixed(4)} µT</p>
+                        <p><strong>Maximum Electric Field:</strong> ${response.results.max_efield.toFixed(4)} V/m</p>
+                        <p><strong>Minimum Electric Field:</strong> ${response.results.min_efield.toFixed(4)} V/m</p>
+                        <p><strong>Sheath Reduction Factor:</strong> ${response.results.sheath_reduction.toFixed(6)}</p>
+                    `;
+                    $('#hvac-mag-results-content').html(resultsHTML);
+                    $('#hvac-mag-results').show();
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error';
+                alert('Calculation failed: ' + error);
+                $('#hvac-mag-plots').html('<div class="plot-container"><p class="text-danger">Calculation failed. Please check your inputs.</p></div>');
+            },
+            complete: function() {
+                // Hide loading
+                $('#hvac-mag-spinner').addClass('d-none');
+                $('#hvac-mag-btn-text').text('Calculate Fields');
+            }
+        });
+    });
+
+    // CSV Export Handler
+    $('#hvac-mag-export-csv').on('click', function() {
+        window.location.href = '/hvac-mag/export-data';
+    });
+});
+</script>

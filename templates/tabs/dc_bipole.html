@@ -1,0 +1,280 @@
+<div class="row">
+    <!-- Left Panel: Input Forms -->
+    <div class="col-md-4">
+        <div class="scrollable-panel">
+            <form id="dc-bipole-form">
+                <!-- Geometry Group -->
+                <div class="input-group-box">
+                    <div class="input-group-title">Geometry</div>
+
+                    <div class="mb-3">
+                        <label for="dc_r_DC" class="form-label">Cable Radius [m]</label>
+                        <input type="number" class="form-control" id="dc_r_DC" name="r_DC"
+                               value="0.060" step="0.001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dc_cable_angle" class="form-label">Cable Angle [deg]</label>
+                        <input type="number" class="form-control" id="dc_cable_angle" name="cable_angle"
+                               value="15.119" step="0.001" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dc_cable_slope" class="form-label">Cable Slope [deg]</label>
+                        <input type="number" class="form-control" id="dc_cable_slope" name="cable_slope"
+                               value="0" step="0.001" required>
+                    </div>
+                </div>
+
+                <!-- Electric Parameters Group -->
+                <div class="input-group-box">
+                    <div class="input-group-title">Electric Parameters</div>
+
+                    <div class="mb-3">
+                        <label for="dc_I_DC" class="form-label">DC Current [A]</label>
+                        <input type="number" class="form-control" id="dc_I_DC" name="I_DC"
+                               value="1000" step="10" required>
+                    </div>
+                </div>
+
+                <!-- Earth Field Group -->
+                <div class="input-group-box">
+                    <div class="input-group-title">Earth Field</div>
+
+                    <div class="mb-3">
+                        <label for="dc_date" class="form-label">Date (DD/MM/YYYY)</label>
+                        <input type="text" class="form-control" id="dc_date" name="date"
+                               value="" placeholder="DD/MM/YYYY" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Location</label>
+                        <input type="text" class="form-control" id="dc_location" readonly
+                               style="background-color: #3a3a3a;" value="Click map to select">
+                    </div>
+
+                    <button type="button" class="btn btn-outline-info w-100 mb-3" id="dc-map-btn">
+                        📍 Select Location from Map
+                    </button>
+
+                    <div class="mb-3">
+                        <label for="dc_B_earth_X" class="form-label">Bx (North) [nT]</label>
+                        <input type="number" class="form-control" id="dc_B_earth_X" name="B_earth_X"
+                               value="9578" step="0.01" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dc_B_earth_Y" class="form-label">By (East) [nT]</label>
+                        <input type="number" class="form-control" id="dc_B_earth_Y" name="B_earth_Y"
+                               value="2588" step="0.01" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dc_B_earth_Z" class="form-label">Bz (Down) [nT]</label>
+                        <input type="number" class="form-control" id="dc_B_earth_Z" name="B_earth_Z"
+                               value="53601" step="0.01" required>
+                    </div>
+                </div>
+
+                <!-- Calculate Button -->
+                <button type="submit" class="btn btn-primary w-100">
+                    <span class="spinner-border spinner-border-sm d-none" id="dc-bipole-spinner"></span>
+                    <span id="dc-bipole-btn-text">Calculate Fields</span>
+                </button>
+
+                <!-- Export Buttons -->
+                <div class="mt-3">
+                    <button type="button" class="btn btn-outline-secondary w-100 mb-2" id="dc-bipole-export-csv">
+                        Export Data (CSV)
+                    </button>
+                </div>
+            </form>
+
+            <!-- Results Display -->
+            <div id="dc-bipole-results" class="mt-3" style="display: none;">
+                <div class="input-group-box">
+                    <div class="input-group-title">Results</div>
+                    <div id="dc-bipole-results-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Plots -->
+    <div class="col-md-8">
+        <div id="dc-bipole-plots">
+            <div class="plot-container">
+                <div class="plot-placeholder">
+                    <i class="bi bi-graph-up" style="font-size: 48px; color: #14ffec;"></i>
+                    <p class="mt-3">Enter parameters and click "Calculate Fields" to generate plots</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Map Modal -->
+<div class="modal fade" id="dc-map-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content" style="background-color: #2d2d30;">
+            <div class="modal-header" style="border-bottom: 1px solid #3e3e42;">
+                <h5 class="modal-title" style="color: #14ffec;">Select Location</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="height: 70vh;">
+                <iframe id="dc-map-iframe" style="width: 100%; height: 100%; border: none;" src=""></iframe>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #3e3e42;">
+                <p class="text-muted me-auto" id="dc-map-status">Click on the map to select a location</p>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Set current date
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    $('#dc_date').val(`${dd}/${mm}/${yyyy}`);
+
+    // Store selected coordinates
+    let selectedLat = null;
+    let selectedLon = null;
+
+    // Map button click handler
+    $('#dc-map-btn').on('click', function() {
+        $('#dc-map-iframe').attr('src', '/dc-bipole/map');
+        $('#dc-map-modal').modal('show');
+        $('#dc-map-status').text('Click on the map to select a location');
+    });
+
+    // Listen for messages from map iframe
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'location_selected') {
+            selectedLat = event.data.lat;
+            selectedLon = event.data.lng;
+
+            $('#dc_location').val(`${selectedLat.toFixed(4)}, ${selectedLon.toFixed(4)}`);
+            $('#dc-map-status').html(`Selected: <strong>${selectedLat.toFixed(4)}, ${selectedLon.toFixed(4)}</strong>. Fetching WMM data...`);
+
+            // Get WMM data for this location
+            const dateStr = $('#dc_date').val();
+            $.ajax({
+                url: '/dc-bipole/get-wmm',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    lat: selectedLat,
+                    lon: selectedLon,
+                    date: dateStr
+                }),
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $('#dc_B_earth_X').val(response.Bx);
+                        $('#dc_B_earth_Y').val(response.By);
+                        $('#dc_B_earth_Z').val(response.Bz);
+                        $('#dc-map-status').html(`<span style="color: #14ffec;">✓ WMM data loaded: Bx=${response.Bx} nT, By=${response.By} nT, Bz=${response.Bz} nT</span>`);
+                    } else {
+                        $('#dc-map-status').html(`<span style="color: #ff6b6b;">Error: ${response.message}</span>`);
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON ? xhr.responseJSON.message : 'WMM calculation failed';
+                    $('#dc-map-status').html(`<span style="color: #ff6b6b;">Error: ${error}</span>`);
+                }
+            });
+        }
+    });
+
+    // Form submission
+    $('#dc-bipole-form').on('submit', function(e) {
+        e.preventDefault();
+
+        // Show loading
+        $('#dc-bipole-spinner').removeClass('d-none');
+        $('#dc-bipole-btn-text').text('Calculating...');
+        $('#dc-bipole-plots').html('<div class="plot-container"><div class="spinner-border" role="status"></div><p class="mt-3">Calculating DC bipole fields... This may take 30-60 seconds for high resolution (800x800)...</p></div>');
+
+        // Get form data
+        const formData = {};
+        $(this).serializeArray().forEach(item => {
+            formData[item.name] = item.value;
+        });
+
+        // Send AJAX request
+        $.ajax({
+            url: '/dc-bipole/calculate',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Display plots
+                    let plotsHTML = '';
+
+                    if (response.plots.bipole_field) {
+                        plotsHTML += `
+                            <div class="plot-container mb-3">
+                                <h5 class="text-center" style="color: #14ffec;">Bipole - Magnetic Field</h5>
+                                <img src="${response.plots.bipole_field}" class="img-fluid" alt="Bipole Magnetic Field">
+                            </div>
+                        `;
+                    }
+
+                    if (response.plots.bipole_perturbation) {
+                        plotsHTML += `
+                            <div class="plot-container mb-3">
+                                <h5 class="text-center" style="color: #14ffec;">Bipole - Perturbation</h5>
+                                <img src="${response.plots.bipole_perturbation}" class="img-fluid" alt="Perturbation">
+                            </div>
+                        `;
+                    }
+
+                    if (response.plots.monopole_field) {
+                        plotsHTML += `
+                            <div class="plot-container mb-3">
+                                <h5 class="text-center" style="color: #14ffec;">Monopole - Magnetic Field</h5>
+                                <img src="${response.plots.monopole_field}" class="img-fluid" alt="Monopole Field">
+                            </div>
+                        `;
+                    }
+
+                    $('#dc-bipole-plots').html(plotsHTML);
+
+                    // Display results
+                    const resultsHTML = `
+                        <p><strong>Max Bipole Field:</strong> ${response.results.max_bipole.toFixed(4)} µT</p>
+                        <p><strong>Min Bipole Field:</strong> ${response.results.min_bipole.toFixed(4)} µT</p>
+                        <p><strong>Max Monopole Field:</strong> ${response.results.max_monopole.toFixed(4)} µT</p>
+                        <p><strong>Min Monopole Field:</strong> ${response.results.min_monopole.toFixed(4)} µT</p>
+                        <p><strong>Earth Field Magnitude:</strong> ${response.results.earth_field.toFixed(2)} nT</p>
+                    `;
+                    $('#dc-bipole-results-content').html(resultsHTML);
+                    $('#dc-bipole-results').show();
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error';
+                alert('Calculation failed: ' + error);
+                $('#dc-bipole-plots').html('<div class="plot-container"><p class="text-danger">Calculation failed. Please check your inputs.</p></div>');
+            },
+            complete: function() {
+                // Hide loading
+                $('#dc-bipole-spinner').addClass('d-none');
+                $('#dc-bipole-btn-text').text('Calculate Fields');
+            }
+        });
+    });
+
+    // CSV Export Handler
+    $('#dc-bipole-export-csv').on('click', function() {
+        window.location.href = '/dc-bipole/export-data';
+    });
+});
+</script>

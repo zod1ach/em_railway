@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}EM Calculator - Main{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-3">
+    <!-- Header -->
+    <div class="app-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="header-title">EM CALCULATOR</h1>
+            <div>
+                <button class="btn btn-outline-info btn-sm me-2" onclick="saveConfiguration()">
+                    <i class="bi bi-download"></i> Save Config
+                </button>
+                <button class="btn btn-outline-info btn-sm me-2" onclick="loadConfiguration()">
+                    <i class="bi bi-upload"></i> Load Config
+                </button>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Tabs -->
+    <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="hvac-nonmag-tab" data-bs-toggle="tab"
+                    data-bs-target="#hvac-nonmag" type="button" role="tab">
+                HVAC NON-MAGNETIC
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="hvac-mag-tab" data-bs-toggle="tab"
+                    data-bs-target="#hvac-mag" type="button" role="tab">
+                HVAC MAGNETIC ARMOUR
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="dc-bipole-tab" data-bs-toggle="tab"
+                    data-bs-target="#dc-bipole" type="button" role="tab">
+                DC BIPOLE
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="wmm-tab" data-bs-toggle="tab"
+                    data-bs-target="#wmm" type="button" role="tab">
+                WMM GEOMAGNETIC
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="cable-3d-tab" data-bs-toggle="tab"
+                    data-bs-target="#cable-3d" type="button" role="tab">
+                3D CABLE
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="mainTabContent">
+        <!-- HVAC Non-Magnetic Tab -->
+        <div class="tab-pane fade show active" id="hvac-nonmag" role="tabpanel">
+            {% include 'tabs/hvac_nonmagnetic.html' %}
+        </div>
+
+        <!-- HVAC Magnetic Armour Tab -->
+        <div class="tab-pane fade" id="hvac-mag" role="tabpanel">
+            {% include 'tabs/hvac_magnetic.html' %}
+        </div>
+
+        <!-- DC Bipole Tab -->
+        <div class="tab-pane fade" id="dc-bipole" role="tabpanel">
+            {% include 'tabs/dc_bipole.html' %}
+        </div>
+
+        <!-- WMM Geomagnetic Tab -->
+        <div class="tab-pane fade" id="wmm" role="tabpanel">
+            {% include 'tabs/wmm_geomag.html' %}
+        </div>
+
+        <!-- 3D Cable Tab -->
+        <div class="tab-pane fade" id="cable-3d" role="tabpanel">
+            {% include 'tabs/cable_3d.html' %}
+        </div>
+    </div>
+</div>
+
+<!-- Hidden file input for config loading -->
+<input type="file" id="config-file-input" accept=".json" style="display: none;">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/calculations.js') }}"></script>
+<script src="{{ url_for('static', filename='js/config.js') }}"></script>
+{% endblock %}
