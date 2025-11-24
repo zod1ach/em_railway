@@ -19,12 +19,11 @@ def create_app(config_name='default'):
     # Load configuration
     app.config.from_object(config[config_name])
 
-    # Initialize Redis for sessions with proper decode_responses
+    # Initialize Redis for sessions
     redis_url = app.config.get('REDIS_URL')
     if redis_url:
-        # Create connection pool with decode_responses=True
-        pool = redis.ConnectionPool.from_url(redis_url, decode_responses=True)
-        app.config['SESSION_REDIS'] = redis.Redis(connection_pool=pool)
+        # Flask-Session 0.8.0 handles encoding internally, don't use decode_responses
+        app.config['SESSION_REDIS'] = redis.from_url(redis_url)
 
     config[config_name].init_app(app)
 

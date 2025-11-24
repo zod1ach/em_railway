@@ -47,10 +47,8 @@ class Config:
         os.makedirs(Config.TEMP_FOLDER, exist_ok=True)
         os.makedirs(Config.SESSION_FOLDER, exist_ok=True)
 
-        # Initialize Redis connection for sessions
-        redis_url = app.config.get('REDIS_URL')
-        if redis_url:
-            app.config['SESSION_REDIS'] = redis.from_url(redis_url, decode_responses=True)
+        # Redis connection is initialized in create_app before init_app is called
+        pass
 
 
 class DevelopmentConfig(Config):
