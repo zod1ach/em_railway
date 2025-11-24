@@ -18,7 +18,7 @@ scipy==1.11.4
 matplotlib==3.8.2
 
 # Geomagnetic Model
-pygeomag==0.1.0
+pygeomag
 
 # Maps and Geometry
 folium==0.15.1
