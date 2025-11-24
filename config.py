@@ -19,7 +19,7 @@ class Config:
     SESSION_USE_SIGNER = True
     SESSION_KEY_PREFIX = 'emcalc:'
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
-    SESSION_REDIS = redis.from_url(REDIS_URL)
+    SESSION_REDIS = redis.from_url(REDIS_URL, decode_responses=True)
 
     # Celery
     CELERY_BROKER_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
