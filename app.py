@@ -19,11 +19,12 @@ def create_app(config_name='default'):
     # Load configuration
     app.config.from_object(config[config_name])
 
-    # Initialize Redis for sessions BEFORE calling init_app
-    import redis
+    # Initialize Redis for sessions with proper decode_responses
     redis_url = app.config.get('REDIS_URL')
     if redis_url:
-        app.config['SESSION_REDIS'] = redis.from_url(redis_url, decode_responses=True)
+        # Create connection pool with decode_responses=True
+        pool = redis.ConnectionPool.from_url(redis_url, decode_responses=True)
+        app.config['SESSION_REDIS'] = redis.Redis(connection_pool=pool)
 
     config[config_name].init_app(app)
 
