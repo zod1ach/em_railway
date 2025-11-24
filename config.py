@@ -26,8 +26,8 @@ class Config:
     CELERY_TASK_TIME_LIMIT = 3600  # 1 hour max
 
     # Authentication
-    USERNAME = 'UoS_EPE'
-    PASSWORD = 'EPEEMAPP2031'
+    USERNAME = os.environ.get('APP_USERNAME') or 'admin'
+    PASSWORD = os.environ.get('APP_PASSWORD') or 'change-me'
 
     # File paths
     TEMP_FOLDER = os.path.join(os.path.dirname(__file__), 'temp')

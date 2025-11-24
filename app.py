@@ -91,6 +91,7 @@ def make_celery(app):
     return celery
 
 
+app = create_app(os.environ.get('FLASK_CONFIG', 'production'))
+
 if __name__ == '__main__':
-    app = create_app(os.environ.get('FLASK_ENV', 'development'))
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=app.config.get('DEBUG', False))
