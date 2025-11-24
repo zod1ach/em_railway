@@ -3,11 +3,15 @@ Configuration file for EM Calculator Web App
 """
 import os
 from datetime import timedelta
+import redis
 
 class Config:
     """Base configuration"""
     # Flask
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+
+    # Redis
+    REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
 
     # Session
     SESSION_TYPE = 'redis'
@@ -15,9 +19,7 @@ class Config:
     SESSION_USE_SIGNER = True
     SESSION_KEY_PREFIX = 'emcalc:'
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
-
-    # Redis
-    REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
+    SESSION_REDIS = redis.from_url(REDIS_URL)
 
     # Celery
     CELERY_BROKER_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
