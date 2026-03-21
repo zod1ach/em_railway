@@ -17,6 +17,7 @@ import { OnboardingForm } from "@/components/ui/onboarding-form";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { EditProfileModal } from "@/components/ui/edit-profile-modal";
 import { ModeSelector, type AppMode } from "@/components/ui/mode-selector";
+import { OfflineApp } from "@/components/OfflineApp";
 import type { Session } from "@supabase/supabase-js";
 
 type AppView = "onboarding" | "landing" | "projects" | "pick-type" | "setup-form" | "dashboard";
@@ -197,32 +198,9 @@ export default function App() {
     );
   }
 
-  /* ── Offline mode: personal projects only ── */
+  /* ── Offline mode: personal projects via IndexedDB ── */
   if (appMode === "offline") {
-    return (
-      <MagneticCursor
-        magneticFactor={0.55}
-        blendMode="exclusion"
-        cursorSize={6}
-        cursorColor="white"
-        contrastBoost={1.5}
-      >
-        <div className="h-[100dvh] w-[100dvw] relative overflow-hidden flex items-center justify-center cursor-none bg-background">
-          <div className="relative z-10 animate-fade-in flex flex-col items-center gap-6">
-            <LaunchButton
-              label="Create a project!"
-              onClick={() => {/* TODO: personal project creation via IndexedDB */}}
-            />
-            <button
-              onClick={handleSwitchMode}
-              className="text-[13px] text-[#666] hover:text-white hover:font-bold transition-all cursor-none"
-            >
-              Switch to team mode →
-            </button>
-          </div>
-        </div>
-      </MagneticCursor>
-    );
+    return <OfflineApp onSwitchMode={handleSwitchMode} />;
   }
 
   /* ── Team mode: waiting for auth ── */
