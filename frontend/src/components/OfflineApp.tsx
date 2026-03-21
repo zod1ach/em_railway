@@ -14,6 +14,8 @@ import { ProjectAvatar } from "@/components/ui/project-avatar";
 import { DownloadButton } from "@/components/ui/download-button";
 import { ProjectSettingsModal } from "@/components/ui/project-settings-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ProjectWorkspace } from "@/components/ui/project-workspace";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import {
   createLocalProject,
   getLocalProjects,
@@ -22,7 +24,7 @@ import {
   type LocalProject,
 } from "@/lib/local-db";
 
-type OfflineView = "landing" | "projects" | "create" | "dashboard";
+type OfflineView = "landing" | "projects" | "create" | "workspace" | "dashboard";
 
 interface OfflineAppProps {
   onSwitchMode: () => void;
@@ -32,6 +34,9 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
   const [view, setView] = useState<OfflineView>("landing");
   const [localProjects, setLocalProjects] = useState<LocalProject[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [activeFileName, setActiveFileName] = useState<string | null>(null);
   const [listView, setListView] = useState<"list" | "card">("list");
   const [settingsProject, setSettingsProject] = useState<LocalProject | null>(null);
   const [deleteProject, setDeleteProject] = useState<LocalProject | null>(null);
@@ -80,7 +85,9 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
 
   const handleSelectProject = (id: string) => {
     setActiveProjectId(id);
-    setView("dashboard");
+    const project = localProjects.find((p) => p.id === id);
+    setActiveProjectName(project?.name ?? "Project");
+    setView("workspace");
   };
 
   const activeProject = localProjects.find((p) => p.id === activeProjectId);
@@ -322,6 +329,29 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
     );
   }
 
+  // Workspace
+  if (view === "workspace" && activeProjectId && activeProjectName) {
+    return (
+      <MagneticCursor magneticFactor={0.55} blendMode="exclusion" cursorSize={6} cursorColor="white" contrastBoost={1.5}>
+        <ProjectWorkspace
+          projectId={activeProjectId}
+          projectName={activeProjectName}
+          projectType="local"
+          onGoToProjects={() => {
+            setActiveProjectId(null);
+            setActiveProjectName(null);
+            setView("projects");
+          }}
+          onSelectFile={(fileId, fileName) => {
+            setActiveFileId(fileId);
+            setActiveFileName(fileName);
+            setView("dashboard");
+          }}
+        />
+      </MagneticCursor>
+    );
+  }
+
   /* ── Dashboard ── */
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
@@ -329,17 +359,18 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
       <header className="sticky top-0 z-50 bg-surface/80 backdrop-blur-md border-b border-border">
         <div className="w-full px-12 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setView("projects")}
-              className="font-display text-[22px] tracking-[0.2em] text-foreground hover:text-accent transition-colors"
-            >
-              ELECTROFISH
-            </button>
+            <span className="font-display text-[22px] tracking-[0.2em] text-foreground">ELECTROFISH</span>
             <div className="w-px h-6 bg-border-accent" />
-            {activeProject && (
-              <span className="text-sm text-muted truncate max-w-[200px]">
-                {activeProject.name}
-              </span>
+            {activeProjectName ? (
+              <Breadcrumbs
+                items={[
+                  { label: "Projects", onClick: () => { setActiveFileId(null); setActiveFileName(null); setActiveProjectId(null); setView("projects"); } },
+                  { label: activeProjectName, onClick: () => { setActiveFileId(null); setActiveFileName(null); setView("workspace"); } },
+                  { label: activeFileName ?? "Dashboard" },
+                ]}
+              />
+            ) : (
+              <span className="font-mono text-[11px] text-muted">v2.0</span>
             )}
           </div>
           <button
