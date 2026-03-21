@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { getProfile, backfillProfileEmail } from "@/lib/profiles";
 import { getUserProjectsGrouped, getProjectCounts, type ProjectWithOwner } from "@/lib/projects";
-import { Login } from "@/pages/Login";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
 import { HvacNonMagnetic } from "@/components/tabs/HvacNonMagnetic";
 import { HvacMagnetic } from "@/components/tabs/HvacMagnetic";
@@ -17,11 +16,32 @@ import { ProjectsCollection } from "@/components/ui/projects-collection";
 import { OnboardingForm } from "@/components/ui/onboarding-form";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { EditProfileModal } from "@/components/ui/edit-profile-modal";
+import { ModeSelector, type AppMode } from "@/components/ui/mode-selector";
 import type { Session } from "@supabase/supabase-js";
 
 type AppView = "onboarding" | "landing" | "projects" | "pick-type" | "setup-form" | "dashboard";
 
+/* ── Persist mode choice in localStorage ── */
+const STORAGE_KEY_MODE = "electrofish_app_mode";
+
+function getSavedMode(): AppMode | null {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_MODE);
+    if (saved === "offline" || saved === "team") return saved;
+  } catch { /* private browsing etc */ }
+  return null;
+}
+
+function saveMode(mode: AppMode) {
+  try { localStorage.setItem(STORAGE_KEY_MODE, mode); } catch { /* ignore */ }
+}
+
+export function clearSavedMode() {
+  try { localStorage.removeItem(STORAGE_KEY_MODE); } catch { /* ignore */ }
+}
+
 export default function App() {
+  const [appMode, setAppMode] = useState<AppMode | null>(getSavedMode);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<AppView>("landing");
@@ -29,8 +49,60 @@ export default function App() {
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [projects, setProjects] = useState<{ personal: ProjectWithOwner[]; team: ProjectWithOwner[] }>({ personal: [], team: [] });
   const [projectCounts, setProjectCounts] = useState<{ personalCount: number; teamCount: number }>({ personalCount: 0, teamCount: 0 });
+  const [authError, setAuthError] = useState("");
 
-  // Check if user has projects and route accordingly
+  // Handle mode selection (offline goes straight through)
+  const handleModeSelect = (mode: AppMode) => {
+    saveMode(mode);
+    setAppMode(mode);
+    if (mode === "offline") {
+      setLoading(false);
+    }
+  };
+
+  // Switch back to mode selection
+  const handleSwitchMode = () => {
+    clearSavedMode();
+    setAppMode(null);
+    setSession(null);
+    setView("landing");
+    setProjects({ personal: [], team: [] });
+    setProjectCounts({ personalCount: 0, teamCount: 0 });
+    setAuthError("");
+  };
+
+  // Auth handlers — passed to ModeSelector for inline login
+  const handleSignIn = async (email: string, password: string) => {
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+    // onAuthStateChange will fire and set session + appMode
+  };
+
+  const handleCreateAccount = async (email: string, password: string) => {
+    setAuthError("");
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      setAuthError(error.message);
+      throw error;
+    }
+  };
+
+  const handleResetPassword = async (email: string) => {
+    setAuthError("");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset`,
+    });
+    if (error) {
+      setAuthError(error.message);
+      throw error;
+    }
+  };
+
+  // Check if user has projects and route accordingly (team mode only)
   const loadProjectsAndRoute = async () => {
     try {
       const grouped = await getUserProjectsGrouped();
@@ -48,32 +120,45 @@ export default function App() {
     }
   };
 
+  // Auth listener — runs always so it catches sign-in from mode selector
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      if (data.session) {
-        try {
-          const profile = await getProfile();
-          if (!profile) {
-            setView("onboarding");
-          } else {
-            backfillProfileEmail();
-            await loadProjectsAndRoute();
+    // Check existing session on mount (only matters for team mode)
+    if (appMode === "team") {
+      supabase.auth.getSession().then(async ({ data }) => {
+        setSession(data.session);
+        if (data.session) {
+          try {
+            const profile = await getProfile();
+            if (!profile) {
+              setView("onboarding");
+            } else {
+              backfillProfileEmail();
+              await loadProjectsAndRoute();
+            }
+          } catch (e) {
+            console.error("Profile check failed:", e);
           }
-        } catch (e) {
-          console.error("Profile check failed:", e);
         }
-      }
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    } else {
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (!session) {
-        setView("landing");
-        setProjects({ personal: [], team: [] });
-        setProjectCounts({ personalCount: 0, teamCount: 0 });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setSession(newSession);
+      if (!newSession) {
+        // Signed out
+        if (appMode === "team") {
+          setView("landing");
+          setProjects({ personal: [], team: [] });
+          setProjectCounts({ personalCount: 0, teamCount: 0 });
+        }
       } else if (_event === "SIGNED_IN") {
+        // User just signed in — activate team mode
+        saveMode("team");
+        setAppMode("team");
+        setLoading(false);
         try {
           const profile = await getProfile();
           if (!profile) {
@@ -88,8 +173,59 @@ export default function App() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [appMode]);
 
+  /* ── Mode selection + inline login ── */
+  if (appMode === null) {
+    return (
+      <MagneticCursor
+        magneticFactor={0.55}
+        blendMode="exclusion"
+        cursorSize={6}
+        cursorColor="white"
+        contrastBoost={1.5}
+      >
+        <ModeSelector
+          onSelect={handleModeSelect}
+          onSignIn={handleSignIn}
+          onCreateAccount={handleCreateAccount}
+          onResetPassword={handleResetPassword}
+          authError={authError}
+          clearAuthError={() => setAuthError("")}
+        />
+      </MagneticCursor>
+    );
+  }
+
+  /* ── Offline mode: personal projects only ── */
+  if (appMode === "offline") {
+    return (
+      <MagneticCursor
+        magneticFactor={0.55}
+        blendMode="exclusion"
+        cursorSize={6}
+        cursorColor="white"
+        contrastBoost={1.5}
+      >
+        <div className="h-[100dvh] w-[100dvw] relative overflow-hidden flex items-center justify-center cursor-none bg-background">
+          <div className="relative z-10 animate-fade-in flex flex-col items-center gap-6">
+            <LaunchButton
+              label="Create a project!"
+              onClick={() => {/* TODO: personal project creation via IndexedDB */}}
+            />
+            <button
+              onClick={handleSwitchMode}
+              className="text-[13px] text-[#666] hover:text-white hover:font-bold transition-all cursor-none"
+            >
+              Switch to team mode →
+            </button>
+          </div>
+        </div>
+      </MagneticCursor>
+    );
+  }
+
+  /* ── Team mode: waiting for auth ── */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -98,10 +234,17 @@ export default function App() {
     );
   }
 
-  if (!session) return <Login onLogin={() => {}} />;
+  // If team mode but no session (e.g., returning user whose session expired), go back to mode selector
+  if (!session) {
+    // Reset to mode selection so the user sees the login form again
+    clearSavedMode();
+    setAppMode(null);
+    return null;
+  }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    handleSwitchMode();
   };
 
   // Persistent UI on all post-login screens
