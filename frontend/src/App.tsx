@@ -21,9 +21,11 @@ import { EditProfileModal } from "@/components/ui/edit-profile-modal";
 import { ModeSelector, type AppMode } from "@/components/ui/mode-selector";
 import { NotificationsPanel } from "@/components/ui/notifications-panel";
 import { OfflineApp } from "@/components/OfflineApp";
+import { ProjectWorkspace } from "@/components/ui/project-workspace";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import type { Session } from "@supabase/supabase-js";
 
-type AppView = "onboarding" | "landing" | "projects" | "pick-type" | "setup-form" | "create-local" | "dashboard";
+type AppView = "onboarding" | "landing" | "projects" | "pick-type" | "setup-form" | "create-local" | "dashboard" | "workspace";
 
 /* ── Persist mode choice in localStorage ── */
 const STORAGE_KEY_MODE = "electrofish_app_mode";
@@ -58,6 +60,11 @@ export default function App() {
   const [localProjects, setLocalProjects] = useState<LocalProject[]>([]);
   const [teamOwnedCount, setTeamOwnedCount] = useState(0);
   const [authError, setAuthError] = useState("");
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProjectType, setActiveProjectType] = useState<"local" | "team">("local");
+  const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [activeFileName, setActiveFileName] = useState<string | null>(null);
 
   // Handle mode selection (offline goes straight through)
   const handleModeSelect = (mode: AppMode) => {
@@ -295,9 +302,11 @@ export default function App() {
               teamProjects={teamProjects}
               localProjects={localProjects}
               ownedCount={teamOwnedCount}
-              onSelectProject={(projectId) => {
-                console.log("Selected project:", projectId);
-                setView("dashboard");
+              onSelectProject={(projectId, projectType, projectName) => {
+                setActiveProjectId(projectId);
+                setActiveProjectType(projectType);
+                setActiveProjectName(projectName);
+                setView("workspace");
               }}
               onCreateTeamProject={() => setView("setup-form")}
               onCreateLocalProject={() => setView("create-local")}
@@ -423,6 +432,31 @@ export default function App() {
     );
   }
 
+  // Workspace
+  if (view === "workspace" && activeProjectId && activeProjectName) {
+    return (
+      <MagneticCursor magneticFactor={0.55} blendMode="exclusion" cursorSize={6} cursorColor="white" contrastBoost={1.5}>
+        {profileDropdown}
+        {editModal}
+        <ProjectWorkspace
+          projectId={activeProjectId}
+          projectName={activeProjectName}
+          projectType={activeProjectType}
+          onGoToProjects={() => {
+            setActiveProjectId(null);
+            setActiveProjectName(null);
+            setView("projects");
+          }}
+          onSelectFile={(fileId, fileName) => {
+            setActiveFileId(fileId);
+            setActiveFileName(fileName);
+            setView("dashboard");
+          }}
+        />
+      </MagneticCursor>
+    );
+  }
+
   // Dashboard
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
@@ -434,7 +468,17 @@ export default function App() {
           <div className="flex items-center gap-4">
             <span className="font-display text-[22px] tracking-[0.2em] text-foreground">ELECTROFISH</span>
             <div className="w-px h-6 bg-border-accent" />
-            <span className="font-mono text-[11px] text-muted">v2.0</span>
+            {activeProjectName ? (
+              <Breadcrumbs
+                items={[
+                  { label: "Projects", onClick: () => { setActiveFileId(null); setActiveFileName(null); setActiveProjectId(null); setView("projects"); } },
+                  { label: activeProjectName, onClick: () => { setActiveFileId(null); setActiveFileName(null); setView("workspace"); } },
+                  { label: activeFileName ?? "Dashboard" },
+                ]}
+              />
+            ) : (
+              <span className="font-mono text-[11px] text-muted">v2.0</span>
+            )}
           </div>
         </div>
       </header>

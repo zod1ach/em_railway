@@ -50,7 +50,7 @@ interface ProjectsCollectionProps {
   teamProjects: ProjectWithOwner[];
   localProjects: LocalProject[];
   ownedCount: number;
-  onSelectProject: (projectId: string) => void;
+  onSelectProject: (projectId: string, projectType: "local" | "team", projectName: string) => void;
   onCreateTeamProject: () => void;
   onCreateLocalProject: () => void;
   onLocalProjectsChange: () => void;
@@ -189,7 +189,7 @@ export function ProjectsCollection({
                           key={project.id}
                           project={project}
                           view={view}
-                          onClick={() => onSelectProject(project.id)}
+                          onClick={() => onSelectProject(project.id, "local", project.name)}
                           onExport={() => handleExport(project.id)}
                           onDelete={() => setDeleteTarget(project)}
                           onSettings={() => setSettingsLocal(project)}
@@ -244,7 +244,7 @@ export function ProjectsCollection({
                           key={project.id}
                           project={project}
                           view={view}
-                          onClick={() => onSelectProject(project.id)}
+                          onClick={() => onSelectProject(project.id, "team", project.name)}
                           onSettings={() => setSettingsTeam(project)}
                           onDelete={() => setDeleteTeamTarget(project)}
                         />
