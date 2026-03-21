@@ -1,13 +1,19 @@
 import { User, Users } from "lucide-react";
+import { PROJECT_LIMITS } from "@/lib/projects";
 
 interface CreateProjectModalProps {
   open: boolean;
   onClose: () => void;
   onSelect: (type: "personal" | "team") => void;
+  personalCount?: number;
+  teamCount?: number;
 }
 
-export function CreateProjectModal({ open, onClose, onSelect }: CreateProjectModalProps) {
+export function CreateProjectModal({ open, onClose, onSelect, personalCount = 0, teamCount = 0 }: CreateProjectModalProps) {
   if (!open) return null;
+
+  const personalAtLimit = personalCount >= PROJECT_LIMITS.personal;
+  const teamAtLimit = teamCount >= PROJECT_LIMITS.team;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -28,8 +34,12 @@ export function CreateProjectModal({ open, onClose, onSelect }: CreateProjectMod
             <div
               data-magnetic
               data-magnetic-static
-              onClick={() => onSelect("personal")}
-              className="group relative flex h-24 w-full items-center justify-between overflow-hidden rounded-2xl bg-white px-7 text-black shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer"
+              onClick={() => !personalAtLimit && onSelect("personal")}
+              className={`group relative flex h-24 w-full items-center justify-between overflow-hidden rounded-2xl px-7 shadow-2xl transition-transform ${
+                personalAtLimit
+                  ? "bg-white/40 text-black/50 cursor-not-allowed"
+                  : "bg-white text-black hover:scale-[1.02] cursor-pointer"
+              }`}
             >
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-medium uppercase tracking-widest opacity-50">
@@ -38,9 +48,17 @@ export function CreateProjectModal({ open, onClose, onSelect }: CreateProjectMod
                 <span className="text-lg font-bold tracking-tight">
                   Personal
                 </span>
+                {personalAtLimit && (
+                  <span className="text-[10px] text-red-500 font-medium">Limit reached</span>
+                )}
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-white">
-                <User className="h-4 w-4 pointer-events-none" />
+              <div className="flex flex-col items-center gap-1">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${personalAtLimit ? "bg-black/30" : "bg-black"} text-white`}>
+                  <User className="h-4 w-4 pointer-events-none" />
+                </div>
+                <span className={`text-[10px] font-bold ${personalAtLimit ? "text-red-500" : "text-black/40"}`}>
+                  {personalCount}/{PROJECT_LIMITS.personal}
+                </span>
               </div>
             </div>
 
@@ -48,8 +66,12 @@ export function CreateProjectModal({ open, onClose, onSelect }: CreateProjectMod
             <div
               data-magnetic
               data-magnetic-static
-              onClick={() => onSelect("team")}
-              className="group relative flex h-24 w-full items-center justify-between overflow-hidden rounded-2xl bg-white px-7 text-black shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer"
+              onClick={() => !teamAtLimit && onSelect("team")}
+              className={`group relative flex h-24 w-full items-center justify-between overflow-hidden rounded-2xl px-7 shadow-2xl transition-transform ${
+                teamAtLimit
+                  ? "bg-white/40 text-black/50 cursor-not-allowed"
+                  : "bg-white text-black hover:scale-[1.02] cursor-pointer"
+              }`}
             >
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-medium uppercase tracking-widest opacity-50">
@@ -58,9 +80,17 @@ export function CreateProjectModal({ open, onClose, onSelect }: CreateProjectMod
                 <span className="text-lg font-bold tracking-tight">
                   Team
                 </span>
+                {teamAtLimit && (
+                  <span className="text-[10px] text-red-500 font-medium">Limit reached</span>
+                )}
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-white">
-                <Users className="h-4 w-4 pointer-events-none" />
+              <div className="flex flex-col items-center gap-1">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${teamAtLimit ? "bg-black/30" : "bg-black"} text-white`}>
+                  <Users className="h-4 w-4 pointer-events-none" />
+                </div>
+                <span className={`text-[10px] font-bold ${teamAtLimit ? "text-red-500" : "text-black/40"}`}>
+                  {teamCount}/{PROJECT_LIMITS.team}
+                </span>
               </div>
             </div>
           </div>

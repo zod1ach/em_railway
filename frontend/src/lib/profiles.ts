@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 export interface Profile {
   id: string;
   email: string | null;
+  username: string | null;
   title: string | null;
   full_name: string;
   affiliation: string | null;
@@ -61,10 +62,11 @@ export async function searchProfiles(query: string): Promise<Profile[]> {
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  const searchTerm = query.startsWith("@") ? query.slice(1) : query;
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .or(`email.ilike.%${query}%,full_name.ilike.%${query}%`)
+    .or(`email.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%`)
     .neq("id", user?.id ?? "")
     .limit(5);
 
@@ -73,6 +75,28 @@ export async function searchProfiles(query: string): Promise<Profile[]> {
     return [];
   }
   return data ?? [];
+}
+
+export async function updateProfile(fields: {
+  username?: string | null;
+  title?: string | null;
+  full_name?: string;
+  affiliation?: string | null;
+  avatar_style?: string;
+  avatar_seed?: string;
+}): Promise<Profile> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(fields)
+    .eq("id", user.id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 // Backfill email for profiles that were created before the email column existed

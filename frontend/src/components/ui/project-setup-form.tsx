@@ -1,31 +1,63 @@
 import { useState, useEffect, useRef } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { createProject } from "@/lib/projects";
 import { searchProfiles, getAvatarUrl, type Profile } from "@/lib/profiles";
 import { supabase } from "@/lib/supabase";
-import { Loader2, X, Eye, Pencil } from "lucide-react";
+import { Loader2, X, Eye, Pencil, ChevronDown } from "lucide-react";
 
-/* ── Custom role toggle — click to switch ── */
-function RoleToggle({ value, onChange, size = "sm" }: {
+/* ── Role dropdown — styled like profile dropdown ── */
+function RoleDropdown({ value, onChange, size = "sm" }: {
   value: "Viewer" | "Editor";
   onChange: (v: "Viewer" | "Editor") => void;
   size?: "sm" | "md";
 }) {
-  const toggle = () => onChange(value === "Viewer" ? "Editor" : "Viewer");
-  const px = size === "sm" ? "px-2 py-0.5 text-[10px] gap-1" : "px-3 py-1.5 text-xs gap-1.5";
+  const h = size === "sm" ? "h-6 text-[10px] gap-1 px-2" : "h-9 text-xs gap-1.5 px-2.5";
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      className={`flex items-center rounded-full border transition-colors ${px} ${
-        value === "Editor"
-          ? "border-white/20 bg-white/10 text-white"
-          : "border-[#333] bg-[#1a1a1a] text-[#888]"
-      } hover:border-[#555]`}
-    >
-      {value === "Viewer" ? <Eye className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
-      {value === "Viewer" ? "View" : "Edit"}
-    </button>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          className={`flex items-center justify-center rounded-full border transition-colors w-[72px] shrink-0 ${h} ${
+            value === "Editor"
+              ? "border-white/20 bg-white/10 text-white"
+              : "border-[#333] bg-[#1a1a1a] text-[#888]"
+          } hover:border-[#555] outline-none cursor-none`}
+        >
+          {value === "Viewer" ? <Eye className="w-3 h-3 shrink-0" /> : <Pencil className="w-3 h-3 shrink-0" />}
+          {value === "Viewer" ? "View" : "Edit"}
+          <ChevronDown className="w-2.5 h-2.5 text-[#666] shrink-0" />
+        </button>
+      </DropdownMenu.Trigger>
+
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={6}
+          className="z-[70] w-44 rounded-xl border border-[#222] bg-[#0d0d0d]/95 backdrop-blur-xl p-1.5 shadow-2xl animate-fade-in"
+        >
+          <DropdownMenu.Item
+            onSelect={() => onChange("Viewer")}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors outline-none cursor-none ${
+              value === "Viewer" ? "text-white bg-[#1a1a1a]" : "text-[#ccc] hover:bg-[#1a1a1a] hover:text-white"
+            }`}
+          >
+            <Eye className="w-4 h-4 text-[#666]" />
+            Can View
+          </DropdownMenu.Item>
+
+          <DropdownMenu.Item
+            onSelect={() => onChange("Editor")}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors outline-none cursor-none ${
+              value === "Editor" ? "text-white bg-[#1a1a1a]" : "text-[#ccc] hover:bg-[#1a1a1a] hover:text-white"
+            }`}
+          >
+            <Pencil className="w-4 h-4 text-[#666]" />
+            Can Edit
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
@@ -200,7 +232,7 @@ function TeamInviteSection({
 }: TeamInviteSectionProps) {
   const [suggestions, setSuggestions] = useState<Profile[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Debounced search
@@ -258,21 +290,21 @@ function TeamInviteSection({
       <div ref={wrapperRef} className="relative">
         <div className="flex gap-2">
           <input
-            type="email"
+            type="text"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onAdd(); } }}
             onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-            placeholder="colleague@soton.ac.uk"
-            className="flex-1 bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#555] focus:outline-none focus:border-[#666] transition-colors"
+            placeholder="@username or email"
+            className="flex-1 min-w-0 bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#555] focus:outline-none focus:border-[#666] transition-colors"
           />
 
-          <RoleToggle value={inviteRole} onChange={setInviteRole} size="md" />
+          <RoleDropdown value={inviteRole} onChange={setInviteRole} size="md" />
 
           <button
             type="button"
             onClick={() => onAdd()}
-            className="px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-white/90 transition-colors"
+            className="px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-white/90 transition-colors shrink-0"
           >
             Invite
           </button>
@@ -299,7 +331,13 @@ function TeamInviteSection({
                   <p className="text-sm text-white truncate">
                     {p.title ? `${p.title} ` : ""}{p.full_name}
                   </p>
-                  <p className="text-[11px] text-[#666] truncate">{p.email}</p>
+                  <div className="flex items-center gap-1.5">
+                    {p.username && (
+                      <span className="text-[11px] text-[#888] truncate">@{p.username}</span>
+                    )}
+                    {p.username && p.email && <span className="text-[10px] text-[#444]">&middot;</span>}
+                    <span className="text-[11px] text-[#666] truncate">{p.email}</span>
+                  </div>
                   {p.affiliation && (
                     <p className="text-[10px] text-[#555] truncate">{p.affiliation}</p>
                   )}
@@ -337,7 +375,7 @@ function TeamInviteSection({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <RoleToggle value={m.role} onChange={(r) => onRoleChange(m.email, r)} />
+                <RoleDropdown value={m.role} onChange={(r) => onRoleChange(m.email, r)} />
                 <button
                   type="button"
                   onClick={() => onRemove(m.email)}
