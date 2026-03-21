@@ -7,7 +7,7 @@ import { WMMGeomag } from "@/components/tabs/WMMGeomag";
 import { Cable3D } from "@/components/tabs/Cable3D";
 import LaunchButton from "@/components/ui/button-with-icon";
 import { MagneticCursor } from "@/components/ui/magnetic-cursor";
-import { Plus, LayoutList, LayoutGrid, Trash2, Download } from "lucide-react";
+import { Plus, Users, LayoutList, LayoutGrid, Trash2, Download } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -165,8 +165,8 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
   if (view === "projects") {
     return (
       <MagneticCursor magneticFactor={0.55} blendMode="exclusion" cursorSize={6} cursorColor="white" contrastBoost={1.5}>
-        <div className="h-[100dvh] w-[100dvw] relative overflow-hidden flex items-center justify-center cursor-none bg-background">
-          <div className="w-full max-w-2xl mx-auto p-4 md:p-8">
+        <div className="h-[100dvh] w-[100dvw] relative overflow-y-auto cursor-none bg-background">
+          <div className="w-full p-6 md:p-10">
             <div className="flex flex-col gap-6">
               {/* Header */}
               <div className="flex items-center justify-between">
@@ -174,6 +174,7 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
                   MY PROJECTS
                 </h2>
                 <div className="flex items-center gap-3">
+                  {/* View toggle */}
                   <div className="flex p-1 bg-[#111] rounded-full border border-[#222]">
                     <button
                       onClick={() => setListView("list")}
@@ -194,16 +195,31 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
                       <LayoutGrid className="w-3.5 h-3.5" />
                     </button>
                   </div>
+
+                  {/* Create button */}
+                  <button
+                    onClick={() => setView("create")}
+                    className="w-9 h-9 flex items-center justify-center rounded-full bg-white text-black hover:bg-white/90 transition-colors cursor-none"
+                    title="New project"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+
+                  {/* Switch to team mode — same size as plus button */}
+                  <button
+                    onClick={onSwitchMode}
+                    className="w-9 h-9 flex items-center justify-center rounded-full bg-[#111] border border-[#333] text-[#666] hover:text-white hover:border-[#555] transition-colors cursor-none"
+                    title="Switch to team mode"
+                  >
+                    <Users className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
               <div className="h-px bg-[#222] w-full" />
 
-              {/* Project list */}
-              <div className={cn(
-                "w-full",
-                listView === "list" ? "flex flex-col gap-3" : "grid grid-cols-2 gap-4"
-              )}>
+              {/* Project grid — always 3 columns */}
+              <div className="w-full grid grid-cols-3 gap-4">
                 <AnimatePresence>
                   {localProjects.map((project) => (
                     <motion.div
@@ -240,9 +256,6 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
                           <h3 className="font-medium text-[15px] text-white leading-tight truncate group-hover:text-accent transition-colors">
                             {project.name}
                           </h3>
-                          {project.description && (
-                            <p className="text-[#888] text-xs truncate">{project.description}</p>
-                          )}
                           <span className="text-[10px] text-[#555]">
                             {new Date(project.updated_at).toLocaleDateString()}
                           </span>
@@ -276,22 +289,6 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
                 </AnimatePresence>
               </div>
 
-              {/* Create + Switch buttons */}
-              <div className="flex flex-col items-center gap-4 mt-4">
-                <button
-                  onClick={() => setView("create")}
-                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-xl bg-white text-black font-medium hover:bg-white/90 transition-all cursor-none"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New Project
-                </button>
-                <button
-                  onClick={onSwitchMode}
-                  className="text-[13px] text-[#666] hover:text-white hover:font-bold transition-all cursor-none"
-                >
-                  Switch to team mode →
-                </button>
-              </div>
             </div>
           </div>
         </div>
