@@ -1,0 +1,120 @@
+import type { ProjectFile, FileCategory, CableSubType } from "@/types/project-files";
+import { supabase } from "./supabase";
+
+const API_BASE = "/api/local-projects";
+
+async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (res.status === 204) return undefined as unknown as T;
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`API error ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
+// Local (SQLite via FastAPI)
+
+export async function getLocalFiles(projectId: string): Promise<ProjectFile[]> {
+  return api<ProjectFile[]>(`/${projectId}/files`);
+}
+
+export async function createLocalFile(
+  projectId: string,
+  category: FileCategory,
+  subType?: CableSubType
+): Promise<ProjectFile> {
+  return api<ProjectFile>(`/${projectId}/files`, {
+    method: "POST",
+    body: JSON.stringify({ category, sub_type: subType ?? null }),
+  });
+}
+
+export async function deleteLocalFile(
+  projectId: string,
+  fileId: string
+): Promise<void> {
+  return api<void>(`/${projectId}/files/${fileId}`, { method: "DELETE" });
+}
+
+// Team (Supabase)
+
+export async function getTeamFiles(projectId: string): Promise<ProjectFile[]> {
+  const { data, error } = await supabase
+    .from("project_files")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ProjectFile[];
+}
+
+export async function createTeamFile(
+  projectId: string,
+  category: FileCategory,
+  subType?: CableSubType
+): Promise<ProjectFile> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  let query = supabase
+    .from("project_files")
+    .select("name")
+    .eq("project_id", projectId)
+    .eq("category", category);
+
+  if (category === "cable" && subType) {
+    query = query.eq("sub_type", subType);
+  }
+
+  const { data: names } = await query;
+
+  let maxNum = 0;
+  for (const row of names ?? []) {
+    const match = row.name.match(/#(\d+)$/);
+    if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
+  }
+
+  let prefix: string;
+  if (category === "cable") {
+    prefix = subType === "dc_bipole" ? "Cable DC Bipole" : "Cable HVAC";
+  } else if (category === "wmm") {
+    prefix = "WMM";
+  } else {
+    prefix = "Bathymetry";
+  }
+
+  const name = `${prefix} #${maxNum + 1}`;
+
+  const { data, error } = await supabase
+    .from("project_files")
+    .insert({
+      project_id: projectId,
+      category,
+      sub_type: subType ?? null,
+      name,
+      created_by: user.id,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as ProjectFile;
+}
+
+export async function deleteTeamFile(
+  projectId: string,
+  fileId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("project_files")
+    .delete()
+    .eq("id", fileId)
+    .eq("project_id", projectId);
+
+  if (error) throw new Error(error.message);
+}
