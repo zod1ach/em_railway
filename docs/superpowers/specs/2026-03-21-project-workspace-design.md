@@ -81,7 +81,7 @@ Naming patterns:
 - WMM files: "WMM #1", "WMM #2", ...
 - Bathymetry files: "Bathymetry #1", "Bathymetry #2", ...
 
-**Name generation is server-side only.** The FastAPI backend generates names for local projects. For team projects, a Supabase database function generates names. The frontend never generates names — it sends `{ category, sub_type? }` and receives the created file with its name.
+**Name generation:** The FastAPI backend generates names for local projects (server-side). For team projects, name generation happens client-side since Supabase lacks a convenient stored-procedure approach. This is acceptable because team projects are limited to 4 files, making race conditions unlikely. The frontend queries existing names, computes the next suffix, and sends the full name with the insert.
 
 ### File Limits
 
