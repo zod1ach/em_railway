@@ -62,7 +62,6 @@ function RoleDropdown({ value, onChange, size = "sm" }: {
 }
 
 interface ProjectSetupFormProps {
-  projectType: "personal" | "team";
   onCreated: (projectId: string) => void;
   onBack: () => void;
 }
@@ -76,7 +75,7 @@ interface PendingMember {
   role: "Viewer" | "Editor";
 }
 
-export function ProjectSetupForm({ projectType, onCreated, onBack }: ProjectSetupFormProps) {
+export function ProjectSetupForm({ onCreated, onBack }: ProjectSetupFormProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
@@ -119,9 +118,9 @@ export function ProjectSetupForm({ projectType, onCreated, onBack }: ProjectSetu
     setSaving(true);
     setError("");
     try {
-      const project = await createProject(name.trim(), description.trim(), projectType);
+      const project = await createProject(name.trim(), description.trim());
 
-      if (projectType === "team" && pendingMembers.length > 0) {
+      if (pendingMembers.length > 0) {
         const memberInserts = pendingMembers.map((m) => ({
           project_id: project.id,
           email: m.email,
@@ -146,10 +145,10 @@ export function ProjectSetupForm({ projectType, onCreated, onBack }: ProjectSetu
         <div className="rounded-2xl border border-[#222] bg-[#0d0d0d]/95 backdrop-blur-xl p-8">
           <div className="mb-6">
             <h2 className="text-lg font-display tracking-[0.15em] text-white">
-              {projectType === "personal" ? "PERSONAL PROJECT" : "TEAM PROJECT"}
+              TEAM PROJECT
             </h2>
             <p className="text-[#666] text-sm mt-1">
-              {projectType === "personal" ? "Set up your workspace" : "Set up a shared workspace"}
+              Set up a shared workspace
             </p>
           </div>
 
@@ -177,18 +176,16 @@ export function ProjectSetupForm({ projectType, onCreated, onBack }: ProjectSetu
               />
             </div>
 
-            {projectType === "team" && (
-              <TeamInviteSection
-                inviteEmail={inviteEmail}
-                setInviteEmail={setInviteEmail}
-                inviteRole={inviteRole}
-                setInviteRole={setInviteRole}
-                pendingMembers={pendingMembers}
-                onAdd={addMember}
-                onRemove={removeMember}
-                onRoleChange={updateMemberRole}
-              />
-            )}
+            <TeamInviteSection
+              inviteEmail={inviteEmail}
+              setInviteEmail={setInviteEmail}
+              inviteRole={inviteRole}
+              setInviteRole={setInviteRole}
+              pendingMembers={pendingMembers}
+              onAdd={addMember}
+              onRemove={removeMember}
+              onRoleChange={updateMemberRole}
+            />
 
             {error && <p className="text-sm text-red-400">{error}</p>}
 

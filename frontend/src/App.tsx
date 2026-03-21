@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { getProfile, backfillProfileEmail } from "@/lib/profiles";
-import { getUserProjectsGrouped, getProjectCounts, type ProjectWithOwner } from "@/lib/projects";
+import { getTeamProjects, getTeamProjectCounts, type ProjectWithOwner } from "@/lib/projects";
+import { getLocalProjects, createLocalProject, type LocalProject } from "@/lib/local-db";
+import { cleanupExpiredInvites } from "@/lib/notifications";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
 import { HvacNonMagnetic } from "@/components/tabs/HvacNonMagnetic";
 import { HvacMagnetic } from "@/components/tabs/HvacMagnetic";
@@ -17,10 +19,11 @@ import { OnboardingForm } from "@/components/ui/onboarding-form";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { EditProfileModal } from "@/components/ui/edit-profile-modal";
 import { ModeSelector, type AppMode } from "@/components/ui/mode-selector";
+import { NotificationsPanel } from "@/components/ui/notifications-panel";
 import { OfflineApp } from "@/components/OfflineApp";
 import type { Session } from "@supabase/supabase-js";
 
-type AppView = "onboarding" | "landing" | "projects" | "pick-type" | "setup-form" | "dashboard";
+type AppView = "onboarding" | "landing" | "projects" | "pick-type" | "setup-form" | "create-local" | "dashboard";
 
 /* ── Persist mode choice in localStorage ── */
 const STORAGE_KEY_MODE = "electrofish_app_mode";
@@ -46,10 +49,14 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<AppView>("landing");
-  const [projectType, setProjectType] = useState<"personal" | "team">("personal");
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [projects, setProjects] = useState<{ personal: ProjectWithOwner[]; team: ProjectWithOwner[] }>({ personal: [], team: [] });
-  const [projectCounts, setProjectCounts] = useState<{ personalCount: number; teamCount: number }>({ personalCount: 0, teamCount: 0 });
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [newLocalName, setNewLocalName] = useState("");
+  const [newLocalDesc, setNewLocalDesc] = useState("");
+  const [creatingLocal, setCreatingLocal] = useState(false);
+  const [teamProjects, setTeamProjects] = useState<ProjectWithOwner[]>([]);
+  const [localProjects, setLocalProjects] = useState<LocalProject[]>([]);
+  const [teamOwnedCount, setTeamOwnedCount] = useState(0);
   const [authError, setAuthError] = useState("");
 
   // Handle mode selection (offline goes straight through)
@@ -67,8 +74,9 @@ export default function App() {
     setAppMode(null);
     setSession(null);
     setView("landing");
-    setProjects({ personal: [], team: [] });
-    setProjectCounts({ personalCount: 0, teamCount: 0 });
+    setTeamProjects([]);
+    setLocalProjects([]);
+    setTeamOwnedCount(0);
     setAuthError("");
   };
 
@@ -103,14 +111,21 @@ export default function App() {
     }
   };
 
-  // Check if user has projects and route accordingly (team mode only)
+  // Check if user has any projects (local + team) and route accordingly
   const loadProjectsAndRoute = async () => {
     try {
-      const grouped = await getUserProjectsGrouped();
-      setProjects(grouped);
-      if (grouped.personal.length > 0 || grouped.team.length > 0) {
-        const counts = await getProjectCounts();
-        setProjectCounts(counts);
+      // Clean up expired invites (7-day TTL)
+      cleanupExpiredInvites().catch(() => {});
+
+      const [team, local] = await Promise.all([
+        getTeamProjects(),
+        getLocalProjects(),
+      ]);
+      setTeamProjects(team);
+      setLocalProjects(local);
+      if (team.length > 0 || local.length > 0) {
+        const counts = await getTeamProjectCounts();
+        setTeamOwnedCount(counts.ownedCount);
         setView("projects");
       } else {
         setView("landing");
@@ -152,8 +167,9 @@ export default function App() {
         // Signed out
         if (appMode === "team") {
           setView("landing");
-          setProjects({ personal: [], team: [] });
-          setProjectCounts({ personalCount: 0, teamCount: 0 });
+          setTeamProjects([]);
+          setLocalProjects([]);
+          setTeamOwnedCount(0);
         }
       } else if (_event === "SIGNED_IN") {
         // User just signed in — activate team mode
@@ -231,7 +247,14 @@ export default function App() {
       key={view}
       onSignOut={handleSignOut}
       onEditProfile={() => setEditProfileOpen(true)}
-      onNotifications={() => {/* TODO: notifications panel */}}
+      onNotifications={() => setNotificationsOpen(true)}
+    />
+  );
+  const notificationsPanel = (
+    <NotificationsPanel
+      open={notificationsOpen}
+      onClose={() => setNotificationsOpen(false)}
+      onActionComplete={loadProjectsAndRoute}
     />
   );
   const editModal = (
@@ -244,6 +267,7 @@ export default function App() {
       <>
         {profileDropdown}
         {editModal}
+        {notificationsPanel}
         <OnboardingForm
           email={session.user.email ?? ""}
           onComplete={() => setView("landing")}
@@ -258,6 +282,7 @@ export default function App() {
       <>
         {profileDropdown}
         {editModal}
+        {notificationsPanel}
         <MagneticCursor
           magneticFactor={0.55}
           blendMode="exclusion"
@@ -265,19 +290,20 @@ export default function App() {
           cursorColor="white"
           contrastBoost={1.5}
         >
-          <div className="h-[100dvh] w-[100dvw] relative overflow-hidden flex items-center justify-center cursor-none bg-background">
+          <div className="h-[100dvh] w-[100dvw] relative overflow-y-auto cursor-none bg-background">
             <ProjectsCollection
-              personalProjects={projects.personal}
-              teamProjects={projects.team}
-              personalCount={projectCounts.personalCount}
-              teamCount={projectCounts.teamCount}
+              teamProjects={teamProjects}
+              localProjects={localProjects}
+              ownedCount={teamOwnedCount}
               onSelectProject={(projectId) => {
                 console.log("Selected project:", projectId);
                 setView("dashboard");
               }}
-              onCreateProject={(type) => {
-                setProjectType(type);
-                setView("setup-form");
+              onCreateTeamProject={() => setView("setup-form")}
+              onCreateLocalProject={() => setView("create-local")}
+              onLocalProjectsChange={async () => {
+                const updated = await getLocalProjects();
+                setLocalProjects(updated);
               }}
             />
           </div>
@@ -288,7 +314,7 @@ export default function App() {
 
   // Pre-dashboard views: landing → pick type → setup form
   if (view !== "dashboard") {
-    const hasProjects = projects.personal.length > 0 || projects.team.length > 0;
+    const hasProjects = teamProjects.length > 0 || localProjects.length > 0;
 
     return (
       <>
@@ -316,18 +342,74 @@ export default function App() {
           <CreateProjectModal
             open={view === "pick-type"}
             onClose={() => setView(hasProjects ? "projects" : "landing")}
-            onSelect={(type) => {
-              setProjectType(type);
-              setView("setup-form");
-            }}
-            personalCount={projectCounts.personalCount}
-            teamCount={projectCounts.teamCount}
+            onSelect={() => setView("setup-form")}
+            ownedCount={teamOwnedCount}
           />
+
+          {/* Create local project form */}
+          {view === "create-local" && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setView("projects")} />
+              <div className="relative z-10 w-full max-w-lg mx-4 animate-fade-in">
+                <div className="rounded-2xl border border-[#222] bg-[#0d0d0d]/95 backdrop-blur-xl p-8">
+                  <div className="mb-6">
+                    <h2 className="text-lg font-display tracking-[0.15em] text-white">PERSONAL PROJECT</h2>
+                    <p className="text-[#666] text-sm mt-1">Stored locally on this machine</p>
+                  </div>
+                  <div className="space-y-5">
+                    <div>
+                      <label className="text-sm text-[#888] block mb-1.5">Project Name</label>
+                      <input
+                        type="text"
+                        value={newLocalName}
+                        onChange={(e) => setNewLocalName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newLocalName.trim()) {
+                            setCreatingLocal(true);
+                            createLocalProject(newLocalName.trim(), newLocalDesc.trim()).then(() => {
+                              setNewLocalName(""); setNewLocalDesc(""); setCreatingLocal(false);
+                              loadProjectsAndRoute();
+                            });
+                          }
+                        }}
+                        placeholder="e.g. North Sea Cable Study"
+                        className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder:text-[#555] focus:outline-none focus:border-[#666] transition-colors"
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-[#888] block mb-1.5">Description</label>
+                      <textarea
+                        value={newLocalDesc}
+                        onChange={(e) => setNewLocalDesc(e.target.value)}
+                        placeholder="Brief description..."
+                        rows={2}
+                        className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder:text-[#555] focus:outline-none focus:border-[#666] transition-colors resize-none"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!newLocalName.trim()) return;
+                        setCreatingLocal(true);
+                        createLocalProject(newLocalName.trim(), newLocalDesc.trim()).then(() => {
+                          setNewLocalName(""); setNewLocalDesc(""); setCreatingLocal(false);
+                          loadProjectsAndRoute();
+                        });
+                      }}
+                      disabled={creatingLocal || !newLocalName.trim()}
+                      className="w-full h-12 rounded-xl bg-white text-black font-medium text-sm hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-none"
+                    >
+                      {creatingLocal ? "Creating..." : "Create Project"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Setup form */}
           {view === "setup-form" && (
             <ProjectSetupForm
-              projectType={projectType}
               onBack={() => setView("pick-type")}
               onCreated={async (projectId) => {
                 console.log("Project created:", projectId);

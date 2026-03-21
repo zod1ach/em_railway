@@ -10,6 +10,7 @@ from api.hvac_magnetic import router as hvac_mag_router
 from api.dc_bipole import router as dc_bipole_router
 from api.wmm_geomag import router as wmm_router
 from api.cable_3d import router as cable_3d_router
+from api.local_projects import router as local_projects_router
 
 app = FastAPI(
     title="EM Calculator API",
@@ -33,6 +34,7 @@ app.include_router(hvac_mag_router, prefix="/api/hvac-mag", tags=["hvac-mag"])
 app.include_router(dc_bipole_router, prefix="/api/dc-bipole", tags=["dc-bipole"])
 app.include_router(wmm_router, prefix="/api/wmm", tags=["wmm"])
 app.include_router(cable_3d_router, prefix="/api/cable-3d", tags=["cable-3d"])
+app.include_router(local_projects_router, prefix="/api/local-projects", tags=["local-projects"])
 
 @app.get("/api/health")
 def health():

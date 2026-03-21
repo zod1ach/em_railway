@@ -7,9 +7,13 @@ import { WMMGeomag } from "@/components/tabs/WMMGeomag";
 import { Cable3D } from "@/components/tabs/Cable3D";
 import LaunchButton from "@/components/ui/button-with-icon";
 import { MagneticCursor } from "@/components/ui/magnetic-cursor";
-import { Plus, Users, LayoutList, LayoutGrid, Trash2, Download } from "lucide-react";
+import { Plus, Users, LayoutList, LayoutGrid, Trash2, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
+import { ProjectAvatar } from "@/components/ui/project-avatar";
+import { DownloadButton } from "@/components/ui/download-button";
+import { ProjectSettingsModal } from "@/components/ui/project-settings-modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   createLocalProject,
   getLocalProjects,
@@ -29,6 +33,8 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
   const [localProjects, setLocalProjects] = useState<LocalProject[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [listView, setListView] = useState<"list" | "card">("list");
+  const [settingsProject, setSettingsProject] = useState<LocalProject | null>(null);
+  const [deleteProject, setDeleteProject] = useState<LocalProject | null>(null);
 
   // Create form state
   const [newName, setNewName] = useState("");
@@ -208,7 +214,7 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
                   {/* Switch to team mode — same size as plus button */}
                   <button
                     onClick={onSwitchMode}
-                    className="w-9 h-9 flex items-center justify-center rounded-full bg-[#111] border border-[#333] text-[#666] hover:text-white hover:border-[#555] transition-colors cursor-none"
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[#111] border border-[#333] text-[#666] hover:text-white hover:border-[#555] transition-colors cursor-none"
                     title="Switch to team mode"
                   >
                     <Users className="w-4 h-4" />
@@ -234,17 +240,12 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
                         listView === "list" ? "flex-row items-center gap-4 w-full" : "flex-col gap-3 w-full items-start"
                       )}
                     >
-                      {/* Initial block */}
+                      {/* Generative pattern block */}
                       <div className={cn(
-                        "relative overflow-hidden shrink-0 bg-[#111] border border-[#222] flex items-center justify-center",
-                        listView === "list" ? "w-14 h-14 rounded-2xl" : "w-full h-24 rounded-2xl"
+                        "shrink-0",
+                        listView === "list" ? "w-14 h-14" : "w-full h-20"
                       )}>
-                        <span className={cn(
-                          "font-display tracking-wider text-[#222] select-none",
-                          listView === "list" ? "text-2xl" : "text-3xl"
-                        )}>
-                          {project.name.charAt(0).toUpperCase()}
-                        </span>
+                        <ProjectAvatar projectId={project.id} className="w-full h-full" />
                       </div>
 
                       {/* Info */}
@@ -264,14 +265,15 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
                         {/* Actions */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleExport(project.id); }}
+                            onClick={(e) => { e.stopPropagation(); setSettingsProject(project); }}
                             className="p-1.5 rounded-lg hover:bg-[#222] text-[#666] hover:text-white transition-colors cursor-none"
-                            title="Download"
+                            title="Settings"
                           >
-                            <Download className="w-3.5 h-3.5" />
+                            <Settings className="w-3.5 h-3.5" />
                           </button>
+                          <DownloadButton onClick={() => handleExport(project.id)} size={16} />
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }}
+                            onClick={(e) => { e.stopPropagation(); setDeleteProject(project); }}
                             className="p-1.5 rounded-lg hover:bg-red-500/10 text-[#666] hover:text-red-400 transition-colors cursor-none"
                             title="Delete"
                           >
@@ -292,6 +294,30 @@ export function OfflineApp({ onSwitchMode }: OfflineAppProps) {
             </div>
           </div>
         </div>
+
+        {/* Settings modal */}
+        <ProjectSettingsModal
+          open={!!settingsProject}
+          onClose={() => setSettingsProject(null)}
+          mode="local"
+          localProject={settingsProject ?? undefined}
+          onSaved={loadProjects}
+        />
+
+        {/* Delete confirmation */}
+        <ConfirmDialog
+          open={!!deleteProject}
+          onClose={() => setDeleteProject(null)}
+          mode="destructive"
+          name={deleteProject?.name ?? ""}
+          itemType="project"
+          onConfirm={async () => {
+            if (deleteProject) {
+              await handleDelete(deleteProject.id);
+              setDeleteProject(null);
+            }
+          }}
+        />
       </MagneticCursor>
     );
   }

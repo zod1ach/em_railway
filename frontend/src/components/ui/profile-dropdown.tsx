@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { User, Bell, LogOut } from "lucide-react";
 import { getProfile, getAvatarUrl, type Profile } from "@/lib/profiles";
+import { getUnreadCount } from "@/lib/notifications";
+import { supabase } from "@/lib/supabase";
 
 type Status = "active" | "away" | "offline";
 
@@ -21,10 +23,33 @@ export function ProfileDropdown({ onSignOut, onEditProfile, onNotifications }: P
   const [profile, setProfile] = useState<Profile | null>(null);
   const [status, setStatus] = useState<Status>("active");
   const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     getProfile().then(setProfile);
+    loadUnreadCount();
+
+    // Realtime subscription for instant notification updates
+    const channel = supabase
+      .channel("notifications-count")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications" },
+        () => loadUnreadCount()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
+
+  const loadUnreadCount = async () => {
+    try {
+      const count = await getUnreadCount();
+      setUnreadCount(count);
+    } catch {
+      // Ignore — might not be authenticated yet
+    }
+  };
 
   useEffect(() => {
     const updateStatus = () => {
@@ -47,6 +72,10 @@ export function ProfileDropdown({ onSignOut, onEditProfile, onNotifications }: P
 
   const avatarSrc = getAvatarUrl(profile.avatar_style, profile.avatar_seed);
   const displayName = profile.username || profile.full_name;
+  const hasNotifications = unreadCount > 0;
+
+  // Dot color: red if unread notifications, green otherwise
+  const dotColor = hasNotifications ? "#ef4444" : "#22c55e";
 
   return (
     <DropdownMenu.Root open={open} onOpenChange={setOpen}>
@@ -61,7 +90,7 @@ export function ProfileDropdown({ onSignOut, onEditProfile, onNotifications }: P
             </div>
             <div
               className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0d0d0d] transition-colors duration-300"
-              style={{ backgroundColor: STATUS_COLORS[status] }}
+              style={{ backgroundColor: dotColor }}
             />
           </div>
         </button>
@@ -97,10 +126,19 @@ export function ProfileDropdown({ onSignOut, onEditProfile, onNotifications }: P
 
           <DropdownMenu.Item
             onSelect={onNotifications}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#ccc] hover:bg-[#1a1a1a] hover:text-white transition-colors outline-none cursor-none"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors outline-none cursor-none ${
+              hasNotifications
+                ? "text-white bg-[#1a1a1a] font-medium"
+                : "text-[#ccc] hover:bg-[#1a1a1a] hover:text-white"
+            }`}
           >
-            <Bell className="w-4 h-4 text-[#666]" />
+            <Bell className={`w-4 h-4 ${hasNotifications ? "text-red-400" : "text-[#666]"}`} />
             Notifications
+            {hasNotifications && (
+              <span className="ml-auto px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold min-w-[18px] text-center">
+                {unreadCount}
+              </span>
+            )}
           </DropdownMenu.Item>
 
           <DropdownMenu.Separator className="h-px bg-[#1a1a1a] my-1" />

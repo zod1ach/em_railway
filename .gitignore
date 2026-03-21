@@ -20,3 +20,8 @@ frontend/dist/
 # Env
 .env
 .env.local
+
+# Local SQLite database
+backend/local_projects.db
+backend/local_projects.db-wal
+backend/local_projects.db-shm

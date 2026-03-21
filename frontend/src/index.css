@@ -117,3 +117,10 @@
 .animate-fade-in {
   animation: fadeIn 1s ease-out forwards;
 }
+
+/* Shine border animation */
+@keyframes shine-pulse {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
