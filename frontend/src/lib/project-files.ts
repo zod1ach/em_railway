@@ -1,4 +1,4 @@
-import type { ProjectFile, FileCategory, CableSubType } from "@/types/project-files";
+import type { ProjectFile, FileCategory, FileSubType } from "@/types/project-files";
 import { supabase } from "./supabase";
 
 const API_BASE = "/api/local-projects";
@@ -25,7 +25,7 @@ export async function getLocalFiles(projectId: string): Promise<ProjectFile[]> {
 export async function createLocalFile(
   projectId: string,
   category: FileCategory,
-  subType?: CableSubType
+  subType?: FileSubType
 ): Promise<ProjectFile> {
   return api<ProjectFile>(`/${projectId}/files`, {
     method: "POST",
@@ -38,6 +38,24 @@ export async function deleteLocalFile(
   fileId: string
 ): Promise<void> {
   return api<void>(`/${projectId}/files/${fileId}`, { method: "DELETE" });
+}
+
+export async function getLocalFileData(
+  projectId: string,
+  fileId: string
+): Promise<Record<string, any>> {
+  return api<Record<string, any>>(`/${projectId}/files/${fileId}/data`);
+}
+
+export async function saveLocalFileData(
+  projectId: string,
+  fileId: string,
+  data: { name?: string; tag?: string; magnetic?: boolean; params?: Record<string, string> }
+): Promise<Record<string, any>> {
+  return api<Record<string, any>>(`/${projectId}/files/${fileId}/data`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
 }
 
 // Team (Supabase)
@@ -56,7 +74,7 @@ export async function getTeamFiles(projectId: string): Promise<ProjectFile[]> {
 export async function createTeamFile(
   projectId: string,
   category: FileCategory,
-  subType?: CableSubType
+  subType?: FileSubType
 ): Promise<ProjectFile> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
@@ -67,7 +85,7 @@ export async function createTeamFile(
     .eq("project_id", projectId)
     .eq("category", category);
 
-  if (category === "cable" && subType) {
+  if (subType) {
     query = query.eq("sub_type", subType);
   }
 
@@ -83,7 +101,7 @@ export async function createTeamFile(
   if (category === "cable") {
     prefix = subType === "dc_bipole" ? "Cable DC Bipole" : "Cable HVAC";
   } else if (category === "wmm") {
-    prefix = "WMM";
+    prefix = subType === "line" ? "WMM Line" : "WMM Grid";
   } else {
     prefix = "Bathymetry";
   }
@@ -117,4 +135,55 @@ export async function deleteTeamFile(
     .eq("project_id", projectId);
 
   if (error) throw new Error(error.message);
+}
+
+export async function getTeamFileData(
+  projectId: string,
+  fileId: string
+): Promise<Record<string, any>> {
+  const { data, error } = await supabase
+    .from("project_files")
+    .select("file_data")
+    .eq("id", fileId)
+    .eq("project_id", projectId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return (data?.file_data ?? {}) as Record<string, any>;
+}
+
+export async function saveTeamFileData(
+  projectId: string,
+  fileId: string,
+  fileData: { name?: string; tag?: string; magnetic?: boolean; params?: Record<string, string> }
+): Promise<Record<string, any>> {
+  // Read existing file_data, merge, and update
+  const { data: existing, error: readErr } = await supabase
+    .from("project_files")
+    .select("file_data")
+    .eq("id", fileId)
+    .eq("project_id", projectId)
+    .single();
+
+  if (readErr) throw new Error(readErr.message);
+
+  const merged = { ...(existing?.file_data ?? {}), ...fileData };
+  if (fileData.params) merged.params = fileData.params;
+
+  const updates: Record<string, any> = {
+    file_data: merged,
+    updated_at: new Date().toISOString(),
+  };
+  if (fileData.name) updates.name = fileData.name;
+
+  const { data, error } = await supabase
+    .from("project_files")
+    .update(updates)
+    .eq("id", fileId)
+    .eq("project_id", projectId)
+    .select("file_data")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return (data?.file_data ?? {}) as Record<string, any>;
 }

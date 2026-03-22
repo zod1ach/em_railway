@@ -143,9 +143,9 @@ export default function App() {
     }
   };
 
-  // Auth listener — runs always so it catches sign-in from mode selector
+  // Auth: getSession() for initial load, onAuthStateChange for subsequent events.
+  // Web Lock deadlock is fixed in supabase.ts — safe with React StrictMode.
   useEffect(() => {
-    // Check existing session on mount (only matters for team mode)
     if (appMode === "team") {
       supabase.auth.getSession().then(async ({ data }) => {
         setSession(data.session);
@@ -168,31 +168,32 @@ export default function App() {
       setLoading(false);
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    // Listen for sign-in / sign-out / token refresh (NOT async to avoid lock re-entry)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
-      if (!newSession) {
-        // Signed out
-        if (appMode === "team") {
-          setView("landing");
-          setTeamProjects([]);
-          setLocalProjects([]);
-          setTeamOwnedCount(0);
-        }
-      } else if (_event === "SIGNED_IN") {
-        // User just signed in — activate team mode
+
+      if (event === "SIGNED_IN") {
         saveMode("team");
         setAppMode("team");
-        setLoading(false);
-        try {
-          const profile = await getProfile();
-          if (!profile) {
-            setView("onboarding");
-          } else {
-            await loadProjectsAndRoute();
+        // Load profile/projects outside the lock scope
+        setTimeout(async () => {
+          try {
+            const profile = await getProfile();
+            if (!profile) {
+              setView("onboarding");
+            } else {
+              await loadProjectsAndRoute();
+            }
+          } catch (e) {
+            console.error("Profile check failed:", e);
           }
-        } catch (e) {
-          console.error("Profile check failed:", e);
-        }
+          setLoading(false);
+        }, 0);
+      } else if (event === "SIGNED_OUT") {
+        setView("landing");
+        setTeamProjects([]);
+        setLocalProjects([]);
+        setTeamOwnedCount(0);
       }
     });
 
@@ -235,12 +236,20 @@ export default function App() {
     );
   }
 
-  // If team mode but no session (e.g., returning user whose session expired), go back to mode selector
+  // If team mode but no session after loading finished, show mode selector
   if (!session) {
-    // Reset to mode selection so the user sees the login form again
-    clearSavedMode();
-    setAppMode(null);
-    return null;
+    return (
+      <MagneticCursor magneticFactor={0.55} blendMode="exclusion" cursorSize={6} cursorColor="white" contrastBoost={1.5}>
+        <ModeSelector
+          onSelect={handleModeSelect}
+          onSignIn={handleSignIn}
+          onCreateAccount={handleCreateAccount}
+          onResetPassword={handleResetPassword}
+          authError={authError}
+          clearAuthError={() => setAuthError("")}
+        />
+      </MagneticCursor>
+    );
   }
 
   const handleSignOut = async () => {
@@ -318,6 +327,31 @@ export default function App() {
           </div>
         </MagneticCursor>
       </>
+    );
+  }
+
+  // Workspace
+  if (view === "workspace" && activeProjectId && activeProjectName) {
+    return (
+      <MagneticCursor magneticFactor={0.55} blendMode="exclusion" cursorSize={6} cursorColor="white" contrastBoost={1.5}>
+        {profileDropdown}
+        {editModal}
+        <ProjectWorkspace
+          projectId={activeProjectId}
+          projectName={activeProjectName}
+          projectType={activeProjectType}
+          onGoToProjects={() => {
+            setActiveProjectId(null);
+            setActiveProjectName(null);
+            setView("projects");
+          }}
+          onSelectFile={(fileId, fileName) => {
+            setActiveFileId(fileId);
+            setActiveFileName(fileName);
+            setView("dashboard");
+          }}
+        />
+      </MagneticCursor>
     );
   }
 
@@ -429,31 +463,6 @@ export default function App() {
         </div>
       </MagneticCursor>
       </>
-    );
-  }
-
-  // Workspace
-  if (view === "workspace" && activeProjectId && activeProjectName) {
-    return (
-      <MagneticCursor magneticFactor={0.55} blendMode="exclusion" cursorSize={6} cursorColor="white" contrastBoost={1.5}>
-        {profileDropdown}
-        {editModal}
-        <ProjectWorkspace
-          projectId={activeProjectId}
-          projectName={activeProjectName}
-          projectType={activeProjectType}
-          onGoToProjects={() => {
-            setActiveProjectId(null);
-            setActiveProjectName(null);
-            setView("projects");
-          }}
-          onSelectFile={(fileId, fileName) => {
-            setActiveFileId(fileId);
-            setActiveFileName(fileName);
-            setView("dashboard");
-          }}
-        />
-      </MagneticCursor>
     );
   }
 

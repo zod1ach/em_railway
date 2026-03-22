@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "motion/react";
 import type { FileCategory, CableSubType } from "@/types/project-files";
 
-const springTransition = {
+const spring = {
   type: "spring",
   damping: 30,
   stiffness: 400,
@@ -18,17 +18,12 @@ type CategoryOption = {
 };
 
 const categories: CategoryOption[] = [
-  { id: "cable", label: "Cable Model", icon: Cable },
-  { id: "wmm", label: "WMM Geomagnetic", icon: Globe },
-  { id: "bathymetry", label: "Bathymetry", icon: Waves },
+  { id: "cable", label: "Cable", icon: Cable },
+  { id: "wmm", label: "WMM", icon: Globe },
+  { id: "bathymetry", label: "Bathy", icon: Waves },
 ];
 
-type SubTypeOption = {
-  id: CableSubType;
-  label: string;
-};
-
-const cableSubTypes: SubTypeOption[] = [
+const cableSubTypes: { id: CableSubType; label: string }[] = [
   { id: "hvac", label: "HVAC" },
   { id: "dc_bipole", label: "DC Bipole" },
 ];
@@ -47,32 +42,24 @@ export function FileCreatorPill({
   fileLimit,
 }: FileCreatorPillProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<FileCategory>("cable");
-  const [selectedSubType, setSelectedSubType] = useState<CableSubType>("hvac");
-  const [showSubType, setShowSubType] = useState(false);
+  const [selected, setSelected] = useState<FileCategory>("cable");
+  const [subType, setSubType] = useState<CableSubType>("hvac");
+  const [showSub, setShowSub] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const handleCategorySelect = (category: FileCategory) => {
-    setSelectedCategory(category);
-    if (category === "cable") {
-      setShowSubType(true);
-    } else {
-      setShowSubType(false);
-    }
+  const handleSelect = (cat: FileCategory) => {
+    setSelected(cat);
+    setShowSub(cat === "cable");
   };
 
   const handleConfirm = async () => {
     setCreating(true);
     try {
-      if (selectedCategory === "cable") {
-        await onCreateFile(selectedCategory, selectedSubType);
-      } else {
-        await onCreateFile(selectedCategory);
-      }
+      await onCreateFile(selected, selected === "cable" ? subType : undefined);
       setIsOpen(false);
-      setShowSubType(false);
+      setShowSub(false);
     } catch {
-      // Error handled by parent (toast)
+      // parent handles error
     } finally {
       setCreating(false);
     }
@@ -81,166 +68,159 @@ export function FileCreatorPill({
   const atLimit = fileLimit !== undefined && fileCount !== undefined && fileCount >= fileLimit;
 
   return (
-    <div className="flex items-center gap-3">
-      <motion.div
-        layout
-        transition={springTransition}
-        className={cn(
-          "flex flex-col gap-1.5 overflow-hidden rounded-3xl bg-[#1c1c1c] p-1.5",
-          disabled || atLimit ? "opacity-40 pointer-events-none" : ""
-        )}
-      >
-        <div className="flex justify-between items-center relative">
-          <motion.div
-            layout
-            animate={{
-              filter: isOpen ? "blur(8px)" : "blur(0px)",
-            }}
-            transition={springTransition}
-            className="px-3 text-[#888] h-full flex items-center justify-center py-2"
-          >
-            New File
-          </motion.div>
+    <motion.div
+      layout
+      transition={spring}
+      className={cn(
+        "flex flex-col gap-1 shadow-lg overflow-hidden rounded-[20px] bg-[#161616] p-1",
+        (disabled || atLimit) && "opacity-40 pointer-events-none"
+      )}
+    >
+      {/* ── Main row ── */}
+      <div className="flex items-center relative h-8">
+        {/* Label — blurs out when open */}
+        <motion.div
+          layout
+          animate={{ filter: isOpen ? "blur(8px)" : "blur(0px)" }}
+          transition={spring}
+          className="px-2.5 text-[#666] text-xs flex items-center gap-1.5 h-full whitespace-nowrap"
+        >
+          <Plus className="w-3 h-3" />
+          New
+        </motion.div>
 
-          {isOpen ? (
-            <div className="absolute w-full h-full flex justify-between gap-2 p-0">
-              <motion.div className="flex justify-between w-full relative items-center rounded-3xl">
-                <motion.div
-                  layout
-                  transition={springTransition}
-                  layoutId="pill-options-bg"
-                  className="absolute w-full rounded-3xl bg-[#0d0d0d] h-full"
-                />
-                <div className="flex justify-between px-1">
-                  {categories.map((cat) => (
-                    <motion.div
-                      key={cat.id}
-                      layout
-                      initial={{ filter: "blur(8px)", opacity: 0 }}
-                      animate={{ filter: "blur(0px)", opacity: 1 }}
-                      onClick={() => handleCategorySelect(cat.id)}
-                      className={cn(
-                        "px-2.5 py-1 rounded-3xl relative transition-colors duration-300 cursor-none flex items-center gap-1.5",
-                        selectedCategory === cat.id ? "text-white" : "text-[#888]"
-                      )}
-                      data-magnetic
-                    >
-                      {selectedCategory === cat.id && (
-                        <motion.div
-                          layoutId="pill-active-option"
-                          transition={springTransition}
-                          className="w-full h-full absolute inset-0 bg-[#222] rounded-3xl"
-                        />
-                      )}
-                      <cat.icon className="w-3.5 h-3.5 relative z-10" />
-                      <span className="relative z-10 text-xs whitespace-nowrap">{cat.label}</span>
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-
-              <AnimatePresence>
-                <motion.div
-                  key="confirm-btn"
-                  layoutId="pill-action-btn"
-                  onClick={creating ? undefined : handleConfirm}
-                  initial={{ filter: "blur(1px)", opacity: 0.6 }}
-                  animate={{ filter: "blur(0px)", opacity: 1 }}
-                  exit={{ filter: "blur(1px)", opacity: 0.6 }}
-                  transition={springTransition}
-                  style={{ borderRadius: 24 }}
-                  className="bg-[#CCFF00] px-[10px] justify-center text-black flex h-full items-center cursor-none"
-                  data-magnetic
-                >
-                  {creating ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                      className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full"
-                    />
-                  ) : (
-                    <Check className="w-4 h-4" />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          ) : (
-            <motion.div
-              onClick={disabled || atLimit ? undefined : () => setIsOpen(true)}
-              className="rounded-full w-fit px-0 p-0 relative flex gap-0 items-center cursor-none"
-              data-magnetic
-            >
+        {isOpen ? (
+          /* ── Expanded: category options + confirm ── */
+          <div className="absolute inset-0 flex gap-1 p-0">
+            <motion.div className="flex flex-1 relative items-center rounded-[16px]">
               <motion.div
                 layout
-                transition={springTransition}
-                layoutId="pill-options-bg"
-                className="absolute h-full w-full bg-[#0d0d0d] rounded-3xl"
+                transition={spring}
+                layoutId="fc-bg"
+                className="absolute inset-0 rounded-[16px] bg-[#0d0d0d]"
               />
-              <motion.div
-                initial={false}
-                className="pl-3 py-0 relative text-white flex items-center gap-1.5"
+              <div className="flex px-0.5 relative z-10">
+                {categories.map((cat) => (
+                  <motion.button
+                    key={cat.id}
+                    layout
+                    initial={{ filter: "blur(6px)", opacity: 0 }}
+                    animate={{ filter: "blur(0px)", opacity: 1 }}
+                    onClick={() => handleSelect(cat.id)}
+                    data-magnetic
+                    className={cn(
+                      "relative px-2 py-1 rounded-[14px] text-[11px] flex items-center gap-1 cursor-none transition-colors duration-200",
+                      selected === cat.id ? "text-white" : "text-[#666] hover:text-[#aaa]"
+                    )}
+                  >
+                    {selected === cat.id && (
+                      <motion.div
+                        layoutId="fc-sel"
+                        transition={spring}
+                        className="absolute inset-0 bg-[#252525] rounded-[14px]"
+                      />
+                    )}
+                    <cat.icon className="w-3 h-3 relative z-10" />
+                    <span className="relative z-10">{cat.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Confirm button */}
+            <AnimatePresence>
+              <motion.button
+                key="fc-confirm"
+                layoutId="fc-btn"
+                onClick={creating ? undefined : handleConfirm}
+                initial={{ filter: "blur(2px)", opacity: 0.6 }}
+                animate={{ filter: "blur(0px)", opacity: 1 }}
+                exit={{ filter: "blur(2px)", opacity: 0.6 }}
+                transition={spring}
+                data-magnetic
+                className="bg-[#CCFF00] w-8 shrink-0 flex items-center justify-center rounded-[14px] cursor-none"
               >
-                <Plus className="w-3.5 h-3.5" />
-              </motion.div>
-              <AnimatePresence initial={false}>
-                <motion.div
-                  key="expand-icon"
-                  layoutId="pill-action-btn"
-                  className="text-[#888] justify-center flex items-center w-fit h-fit px-3 pl-2 py-[10px]"
-                >
-                  <ChevronsUpDown className="w-3.5 h-3.5 -rotate-90" />
-                </motion.div>
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </div>
-
-        <AnimatePresence mode="popLayout">
-          {isOpen && showSubType && selectedCategory === "cable" && (
+                {creating ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                    className="w-3.5 h-3.5 border-[1.5px] border-black/20 border-t-black rounded-full"
+                  />
+                ) : (
+                  <Check className="w-3.5 h-3.5 text-black" />
+                )}
+              </motion.button>
+            </AnimatePresence>
+          </div>
+        ) : (
+          /* ── Collapsed: just the + trigger ── */
+          <motion.button
+            onClick={() => setIsOpen(true)}
+            data-magnetic
+            className="absolute inset-0 flex items-center cursor-none"
+          >
             <motion.div
-              initial={{ opacity: 0, y: -10, filter: "blur(8px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -10, filter: "blur(8px)" }}
-              transition={springTransition}
-              className="flex text-[#888] px-2 bg-[#0d0d0d] overflow-hidden rounded-full py-1 gap-1"
-            >
-              {cableSubTypes.map((st, index) => (
-                <motion.div
-                  key={st.id}
-                  layout
-                  initial={{ filter: "blur(8px)", opacity: 0 }}
-                  animate={{ filter: "blur(0px)", opacity: 1 }}
-                  exit={{ filter: "blur(8px)", opacity: 0 }}
-                  transition={{ ...springTransition, delay: index * 0.03 }}
-                  onClick={() => setSelectedSubType(st.id)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-3xl relative transition-colors duration-300 cursor-none text-xs",
-                    selectedSubType === st.id ? "text-white" : "text-[#888]"
-                  )}
-                  data-magnetic
-                >
-                  <span className="relative z-10">{st.label}</span>
-                  {selectedSubType === st.id && (
-                    <motion.div
-                      transition={springTransition}
-                      layoutId="pill-subtype-active"
-                      className="absolute h-full w-full bg-[#222] inset-0 rounded-3xl"
-                    />
-                  )}
-                </motion.div>
-              ))}
+              layout
+              transition={spring}
+              layoutId="fc-bg"
+              className="absolute inset-0 rounded-[16px] bg-[#0d0d0d]"
+            />
+            <motion.div className="relative z-10 flex items-center w-full justify-between px-2.5">
+              <span className="text-[11px] text-white font-medium">+</span>
+              <motion.div layoutId="fc-btn">
+                <ChevronsUpDown className="w-3 h-3 text-[#555] -rotate-90" />
+              </motion.div>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+          </motion.button>
+        )}
+      </div>
 
+      {/* ── Sub-type row (Cable → HVAC / DC Bipole) ── */}
+      <AnimatePresence mode="popLayout">
+        {isOpen && showSub && selected === "cable" && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, filter: "blur(6px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -6, filter: "blur(6px)" }}
+            transition={spring}
+            className="flex text-[#666] bg-[#0d0d0d] overflow-hidden rounded-[14px] p-0.5 gap-0.5"
+          >
+            {cableSubTypes.map((st, i) => (
+              <motion.button
+                key={st.id}
+                layout
+                initial={{ filter: "blur(6px)", opacity: 0 }}
+                animate={{ filter: "blur(0px)", opacity: 1 }}
+                exit={{ filter: "blur(6px)", opacity: 0 }}
+                transition={{ ...spring, delay: i * 0.03 }}
+                onClick={() => setSubType(st.id)}
+                data-magnetic
+                className={cn(
+                  "relative px-3 py-1 rounded-[12px] text-[11px] cursor-none transition-colors duration-200",
+                  subType === st.id ? "text-white" : "text-[#666] hover:text-[#aaa]"
+                )}
+              >
+                <span className="relative z-10">{st.label}</span>
+                {subType === st.id && (
+                  <motion.div
+                    layoutId="fc-sub"
+                    transition={spring}
+                    className="absolute inset-0 bg-[#252525] rounded-[12px]"
+                  />
+                )}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── File count badge (team only) ── */}
       {fileLimit !== undefined && fileCount !== undefined && (
-        <span className="text-xs text-[#888]">
-          <span className={cn(atLimit ? "text-error" : "text-white")}>{fileCount}</span>
-          {" / "}
-          {fileLimit} files
-        </span>
+        <div className="px-2 pb-1 text-[10px] text-[#555]">
+          <span className={cn(atLimit ? "text-red-400" : "text-[#888]")}>{fileCount}</span>
+          /{fileLimit}
+        </div>
       )}
-    </div>
+    </motion.div>
   );
 }

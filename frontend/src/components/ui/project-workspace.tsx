@@ -1,21 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Cable, Globe, File } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  Minus, Plus, ChevronDown, Trash2, Settings, Cable, Globe, Waves,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ProjectAvatar } from "@/components/ui/project-avatar";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { FileCreatorPill } from "@/components/ui/file-creator-pill";
+import { TreeView, type TreeNode } from "@/components/ui/tree-view";
+import { CableTypePicker } from "@/components/ui/cable-type-picker";
+import { HvacForm } from "@/components/ui/hvac-form";
+import { DCBipoleForm } from "@/components/ui/dc-bipole-form";
+import { HoldDeleteButton } from "@/components/ui/hold-delete-button";
+import { WMMForm } from "@/components/ui/wmm-form";
+import { WMMTypePicker } from "@/components/ui/wmm-type-picker";
 import {
   getLocalFiles, createLocalFile, deleteLocalFile,
   getTeamFiles, createTeamFile, deleteTeamFile,
+  getLocalFileData, saveLocalFileData,
+  getTeamFileData, saveTeamFileData,
 } from "@/lib/project-files";
 import type { ProjectFile, FileCategory, CableSubType } from "@/types/project-files";
 import { TEAM_FILE_LIMIT } from "@/types/project-files";
-
-const snappySpring = { type: "spring", stiffness: 350, damping: 30, mass: 1 } as const;
 
 interface ProjectWorkspaceProps {
   projectId: string;
@@ -27,10 +29,10 @@ interface ProjectWorkspaceProps {
   onOpenSettings?: () => void;
 }
 
-const categoryConfig: { id: FileCategory; label: string; icon: typeof Cable }[] = [
-  { id: "cable", label: "Cable Model", icon: Cable },
-  { id: "wmm", label: "WMM Geomagnetic", icon: Globe },
-  { id: "bathymetry", label: "Bathymetry", icon: Waves },
+/* ── Category folder config ── */
+const FOLDERS: { id: FileCategory; label: string; icon: React.ReactNode }[] = [
+  { id: "cable", label: "Cable Model", icon: <Cable className="h-4 w-4" /> },
+  { id: "wmm", label: "WMM Model", icon: <Globe className="h-4 w-4" /> },
 ];
 
 export function ProjectWorkspace({
@@ -44,17 +46,18 @@ export function ProjectWorkspace({
 }: ProjectWorkspaceProps) {
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [allCollapsed, setAllCollapsed] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState<Record<FileCategory, boolean>>({
-    cable: false,
-    wmm: false,
-    bathymetry: false,
-  });
-  const [deleteTarget, setDeleteTarget] = useState<ProjectFile | null>(null);
+  const [treeOpen, setTreeOpen] = useState(true);
+  const [cablePickerOpen, setCablePickerOpen] = useState(false);
+  const [showHvacForm, setShowHvacForm] = useState(false);
+  const [showDcForm, setShowDcForm] = useState(false);
+  const [showWmmForm, setShowWmmForm] = useState(false);
+  const [wmmPickerOpen, setWmmPickerOpen] = useState(false);
+  const [wmmCreateMode, setWmmCreateMode] = useState<"grid" | "line">("grid");
 
   const isTeam = projectType === "team";
   const canEdit = !isTeam || myRole === "Owner" || myRole === "Editor";
 
+  /* ── Load files ── */
   const loadFiles = useCallback(async () => {
     try {
       const data = isTeam
@@ -70,239 +73,443 @@ export function ProjectWorkspace({
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
 
-  const handleCreateFile = async (category: FileCategory, subType?: CableSubType) => {
-    const file = isTeam
-      ? await createTeamFile(projectId, category, subType)
-      : await createLocalFile(projectId, category, subType);
-    setFiles((prev) => [...prev, file]);
+
+  /* ── File icon color helper ── */
+  const getFileIconColor = (f: ProjectFile): string => {
+    if (f.category === "cable") {
+      if (f.sub_type === "dc_bipole") return "#facc15"; // yellow-400
+      return "#9f1239"; // rose-800 (maroon)
+    }
+    if (f.category === "wmm") {
+      if (f.sub_type === "line") return "#facc15"; // yellow-400
+      return "#c084fc"; // purple-400
+    }
+    return "#ffffff";
   };
 
-  const handleDeleteFile = async () => {
-    if (!deleteTarget) return;
+  /* ── Build tree data ── */
+  const treeData: TreeNode[] = useMemo(() => {
+    return FOLDERS.map((folder) => {
+      const folderFiles = files.filter((f) => f.category === folder.id);
+      const children: TreeNode[] = folderFiles.map((f) => ({
+        id: f.id,
+        label: f.name,
+        icon: <File className="h-4 w-4" style={{ color: getFileIconColor(f) }} />,
+        data: f,
+      }));
+      return {
+        id: `folder-${folder.id}`,
+        label: folder.label,
+        icon: folder.icon,
+        children,
+      };
+    });
+  }, [files]);
+
+  const [editingFile, setEditingFile] = useState<ProjectFile | null>(null);
+  const [editingFileData, setEditingFileData] = useState<Record<string, any> | null>(null);
+
+  const getFileData = isTeam ? getTeamFileData : getLocalFileData;
+  const saveFileData = isTeam ? saveTeamFileData : saveLocalFileData;
+
+  const closeAllForms = () => {
+    setShowHvacForm(false);
+    setShowDcForm(false);
+    setShowWmmForm(false);
+    setEditingFile(null);
+    setEditingFileData(null);
+  };
+
+  const openFileForEdit = async (file: ProjectFile) => {
+    closeAllForms();
     try {
-      if (isTeam) {
-        await deleteTeamFile(projectId, deleteTarget.id);
+      const data = await getFileData(projectId, file.id);
+      setEditingFileData(data);
+    } catch {
+      setEditingFileData({});
+    }
+    setEditingFile(file);
+  };
+
+  const handleNodeClick = async (node: TreeNode) => {
+    if (node.data) {
+      const file = node.data as ProjectFile;
+      if (file.category === "cable" || file.category === "wmm") {
+        await openFileForEdit(file);
       } else {
-        await deleteLocalFile(projectId, deleteTarget.id);
+        onSelectFile(file.id, file.name);
       }
-      setFiles((prev) => prev.filter((f) => f.id !== deleteTarget.id));
-    } finally {
-      setDeleteTarget(null);
     }
   };
 
-  const toggleAllCollapsed = () => {
-    const newState = !allCollapsed;
-    setAllCollapsed(newState);
-    setCollapsedSections({ cable: newState, wmm: newState, bathymetry: newState });
-  };
-
-  const toggleSection = (category: FileCategory) => {
-    setCollapsedSections((prev) => ({ ...prev, [category]: !prev[category] }));
-  };
-
-  const filesByCategory = (category: FileCategory) =>
-    files.filter((f) => f.category === category);
-
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="sticky top-0 z-50 bg-surface/80 backdrop-blur-md border-b border-border">
-        <div className="w-full px-12 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="font-display text-[22px] tracking-[0.2em] text-foreground">ELECTROFISH</span>
-            <div className="w-px h-6 bg-border-accent" />
-            <Breadcrumbs
-              items={[
-                { label: "Projects", onClick: onGoToProjects },
-                { label: projectName },
-              ]}
-            />
-          </div>
-          {isTeam && myRole === "Owner" && onOpenSettings && (
-            <button
-              onClick={onOpenSettings}
-              data-magnetic
-              className="p-2 rounded-xl text-[#888] hover:text-white hover:bg-[#1a1a1a] transition-colors cursor-none"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-          )}
+    <div className="min-h-screen flex flex-col bg-[#0d0d0d] cursor-none">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-[#0d0d0d]/80 backdrop-blur-md">
+        <div className="w-full px-12 h-16 flex items-center">
+          <Breadcrumbs
+            items={[
+              { label: "Projects", onClick: onGoToProjects },
+              { label: projectName },
+            ]}
+          />
         </div>
       </header>
 
-      <div className="px-12 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {canEdit && (
-            <FileCreatorPill
-              onCreateFile={handleCreateFile}
-              disabled={!canEdit}
-              fileCount={isTeam ? files.length : undefined}
-              fileLimit={isTeam ? TEAM_FILE_LIMIT : undefined}
+      {/* Main content — tree on left, form on right */}
+      <main className="flex-1 px-12 py-6">
+        {/* Hamburger toggle */}
+        <button
+          onClick={() => setTreeOpen((v) => !v)}
+          className="mb-3 cursor-none"
+        >
+          <svg viewBox="0 0 40 40" fill="none" style={{ width: 20, height: 20 }}>
+            <motion.line
+              x1="10" x2="30" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"
+              animate={treeOpen ? { y1: 20, y2: 20, rotate: 45 } : { y1: 12, y2: 12, rotate: 0 }}
+              transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+              style={{ transformOrigin: "20px 20px" }}
             />
-          )}
-          <motion.button
-            layout
-            transition={snappySpring}
-            onClick={toggleAllCollapsed}
-            data-magnetic
-            className="flex items-center gap-1.5 rounded-3xl bg-[#1c1c1c] px-3 py-2 text-[#888] hover:text-white transition-colors cursor-none"
-          >
-            {allCollapsed ? <Plus className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
-          </motion.button>
-        </div>
-      </div>
+            <motion.line
+              x1="10" y1="20" x2="30" y2="20" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"
+              animate={treeOpen ? { opacity: 0, scaleX: 0 } : { opacity: 1, scaleX: 1 }}
+              transition={{ duration: 0.2 }}
+              style={{ transformOrigin: "20px 20px" }}
+            />
+            <motion.line
+              x1="10" x2="30" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"
+              animate={treeOpen ? { y1: 20, y2: 20, rotate: -45 } : { y1: 28, y2: 28, rotate: 0 }}
+              transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+              style={{ transformOrigin: "20px 20px" }}
+            />
+          </svg>
+        </button>
 
-      <main className="flex-1 px-12 pb-12 space-y-6">
-        {loading ? (
-          <div className="space-y-6">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="space-y-3">
-                <div className="h-10 w-48 bg-[#1c1c1c] rounded-xl animate-pulse" />
-                <div className="grid grid-cols-3 gap-4">
-                  {[0, 1, 2].map((j) => (
-                    <div key={j} className="h-24 bg-[#111] border border-[#222] rounded-2xl animate-pulse" />
+        <div className="flex gap-12 items-start">
+        {/* Tree view — left side */}
+        <AnimatePresence>
+          {treeOpen && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: "auto", opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              style={{ overflow: "visible" }}
+              className="shrink-0"
+            >
+              {loading ? (
+                <div className="w-fit space-y-2">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-10 bg-[#161616] rounded-lg animate-pulse" />
                   ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          categoryConfig.map((cat) => {
-            const catFiles = filesByCategory(cat.id);
-            const isCollapsed = collapsedSections[cat.id];
+              ) : (
+                <div className="w-fit">
+                  <TreeView
+                    data={treeData}
+                    onNodeClick={handleNodeClick}
+                    onAddClick={(node) => {
+                      const folderId = node.id.replace("folder-", "");
+                      if (folderId === "cable") {
+                        setCablePickerOpen(true);
+                      } else if (folderId === "wmm") {
+                        setWmmPickerOpen(true);
+                      }
+                    }}
+                    renderAfterAdd={(node) => {
+                      if (node.id === "folder-cable") {
+                        return (
+                          <CableTypePicker
+                            open={cablePickerOpen}
+                            onClose={() => setCablePickerOpen(false)}
+                            onSelect={(subType) => {
+                              closeAllForms();
+                              if (subType === "hvac") {
+                                setShowHvacForm(true);
+                              } else {
+                                setShowDcForm(true);
+                              }
+                            }}
+                          />
+                        );
+                      }
+                      if (node.id === "folder-wmm") {
+                        return (
+                          <WMMTypePicker
+                            open={wmmPickerOpen}
+                            onClose={() => setWmmPickerOpen(false)}
+                            onSelect={(mode) => {
+                              closeAllForms();
+                              setShowWmmForm(true);
+                              // Store selected mode for the form — we'll pass it via state
+                              setWmmCreateMode(mode);
+                            }}
+                          />
+                        );
+                      }
+                      return null;
+                    }}
+                    renderAfterNode={(node) => {
+                      if (!node.data) return null;
+                      const file = node.data as ProjectFile;
+                      if (isTeam && myRole !== "Owner") return null;
 
-            return (
-              <div key={cat.id}>
-                <button
-                  onClick={() => toggleSection(cat.id)}
-                  data-magnetic
-                  className="flex items-center gap-3 mb-3 group cursor-none"
-                >
-                  <cat.icon className={cn("w-4 h-4", isCollapsed ? "text-[#888]" : "text-white")} />
-                  <span className={cn(
-                    "text-sm font-medium transition-colors",
-                    isCollapsed ? "text-[#888] group-hover:text-white" : "text-white"
-                  )}>
-                    {cat.label}
-                  </span>
-                  <span className="text-xs text-[#555] bg-[#1c1c1c] px-2 py-0.5 rounded-full">
-                    {catFiles.length}
-                  </span>
-                  <motion.div
-                    animate={{ rotate: isCollapsed ? -90 : 0 }}
-                    transition={snappySpring}
-                  >
-                    <ChevronDown className="w-3.5 h-3.5 text-[#555]" />
-                  </motion.div>
-                </button>
+                      return (
+                        <HoldDeleteButton
+                          onDelete={async () => {
+                            if (isTeam) {
+                              await deleteTeamFile(projectId, file.id);
+                            } else {
+                              await deleteLocalFile(projectId, file.id);
+                            }
+                            setFiles((prev) => prev.filter((f) => f.id !== file.id));
+                            if (editingFile?.id === file.id) {
+                              setEditingFile(null);
+                              setEditingFileData(null);
+                            }
+                          }}
+                          holdDuration={3000}
+                        />
+                      );
+                    }}
+                    renderLabel={(node, isFolder) => {
+                      if (isFolder) return node.label;
+                      const file = node.data as ProjectFile | undefined;
+                      if (!file) return node.label;
 
-                <AnimatePresence initial={false}>
-                  {!isCollapsed && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={snappySpring}
-                      className="overflow-hidden"
-                    >
-                      {catFiles.length === 0 ? (
-                        <div className="border border-dashed border-[#333] rounded-2xl p-8 text-center">
-                          <span className="text-sm text-[#555]">No files yet</span>
-                        </div>
-                      ) : (
-                        <motion.div layout transition={snappySpring} className="grid grid-cols-3 gap-4">
-                          {catFiles.map((file) => (
-                            <FileCard
-                              key={file.id}
-                              file={file}
-                              canDelete={canEdit}
-                              onClick={() => onSelectFile(file.id, file.name)}
-                              onDelete={() => setDeleteTarget(file)}
-                            />
-                          ))}
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })
-        )}
+                      let color = "text-white"; // HVAC Non-Magnetic default
+                      let bgColor = "";
+
+                      if (file.category === "cable") {
+                        if (file.sub_type === "dc_bipole") {
+                          color = "text-yellow-400";
+                          bgColor = "bg-yellow-400/[0.15]";
+                        } else {
+                          // HVAC — maroon for non-magnetic (default)
+                          color = "text-rose-800";
+                          bgColor = "bg-rose-800/[0.15]";
+                        }
+                      } else if (file.category === "wmm") {
+                        if (file.sub_type === "line") {
+                          color = "text-yellow-400";
+                          bgColor = "bg-yellow-400/[0.15]";
+                        } else {
+                          // grid or unset
+                          color = "text-purple-400";
+                          bgColor = "bg-purple-400/[0.15]";
+                        }
+                      }
+
+                      return (
+                        <span className={cn(color, bgColor, bgColor && "px-1.5 py-0.5 rounded")}>
+                          {node.label}
+                        </span>
+                      );
+                    }}
+                    defaultExpandedIds={FOLDERS.map((f) => `folder-${f.id}`)}
+                    showLines
+                    showIcons
+                    className="bg-[#0d0d0d]"
+                  />
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Form panel — right side, aligned with top of tree */}
+        <div className="flex-1 max-w-2xl">
+          {/* HVAC Create */}
+          <AnimatePresence>
+            {showHvacForm && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <HvacForm
+                  onClose={() => setShowHvacForm(false)}
+                  onSave={async (data) => {
+                    const create = isTeam ? createTeamFile : createLocalFile;
+                    const file = await create(projectId, "cable", "hvac");
+                    {
+                      await saveFileData(projectId, file.id, {
+                        name: data.name,
+                        tag: data.tag,
+                        magnetic: data.magnetic,
+                        params: data.values,
+                      });
+                    }
+                    setFiles((prev) => [...prev, file]);
+                    await loadFiles();
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* HVAC Edit */}
+          <AnimatePresence>
+            {editingFile && editingFileData && editingFile.category === "cable" && editingFile.sub_type === "hvac" && (
+              <motion.div
+                key={editingFile.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <HvacForm
+                  onClose={() => { setEditingFile(null); setEditingFileData(null); }}
+                  readOnly={!canEdit}
+                  existingFile={{
+                    name: editingFileData.name ?? editingFile.name,
+                    tag: editingFileData.tag ?? "",
+                    magnetic: editingFileData.magnetic ?? false,
+                    values: editingFileData.params ?? {},
+                  }}
+                  onSave={async (data) => {
+                    await saveFileData(projectId, editingFile.id, {
+                      name: data.name,
+                      tag: data.tag,
+                      magnetic: data.magnetic,
+                      params: data.values,
+                    });
+                    await loadFiles();
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* DC Bipole Create */}
+          <AnimatePresence>
+            {showDcForm && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <DCBipoleForm
+                  onClose={() => setShowDcForm(false)}
+                  onSave={async (data) => {
+                    const create = isTeam ? createTeamFile : createLocalFile;
+                    const file = await create(projectId, "cable", "dc_bipole");
+                    {
+                      await saveFileData(projectId, file.id, {
+                        name: data.name,
+                        tag: data.tag,
+                        params: data.values,
+                      });
+                    }
+                    setFiles((prev) => [...prev, file]);
+                    await loadFiles();
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* DC Bipole Edit */}
+          <AnimatePresence>
+            {editingFile && editingFileData && editingFile.category === "cable" && editingFile.sub_type === "dc_bipole" && (
+              <motion.div
+                key={editingFile.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25 }}
+            >
+              <DCBipoleForm
+                onClose={() => { setEditingFile(null); setEditingFileData(null); }}
+                readOnly={!canEdit}
+                existingFile={{
+                  name: editingFileData.name ?? editingFile.name,
+                  tag: editingFileData.tag ?? "",
+                  values: editingFileData.params ?? {},
+                }}
+                onSave={async (data) => {
+                  await saveFileData(projectId, editingFile.id, {
+                    name: data.name,
+                    tag: data.tag,
+                    params: data.values,
+                  });
+                  await loadFiles();
+                }}
+              />
+            </motion.div>
+          )}
+          </AnimatePresence>
+
+          {/* WMM Create */}
+          <AnimatePresence>
+            {showWmmForm && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <WMMForm
+                  onClose={() => setShowWmmForm(false)}
+                  initialMode={wmmCreateMode}
+                  isTeam={isTeam}
+                  onSave={async (data) => {
+                    const create = isTeam ? createTeamFile : createLocalFile;
+                    const file = await create(projectId, "wmm", wmmCreateMode);
+                    {
+                      await saveFileData(projectId, file.id, {
+                        name: data.name,
+                        tag: data.tag,
+                        params: { ...data.values, mode: data.mode, coordinates: data.coordinates ?? "", waypoints: data.waypoints ?? "" },
+                      });
+                    }
+                    setFiles((prev) => [...prev, file]);
+                    await loadFiles();
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* WMM Edit */}
+          <AnimatePresence>
+            {editingFile && editingFileData && editingFile.category === "wmm" && (
+              <motion.div
+                key={editingFile.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <WMMForm
+                  onClose={() => { setEditingFile(null); setEditingFileData(null); }}
+                  readOnly={!canEdit}
+                  isTeam={isTeam}
+                  existingFile={{
+                    name: editingFileData.name ?? editingFile.name,
+                    tag: editingFileData.tag ?? "",
+                    mode: editingFileData.params?.mode ?? "grid",
+                    values: editingFileData.params ?? {},
+                    coordinates: editingFileData.params?.coordinates ?? "",
+                    waypoints: editingFileData.params?.waypoints ?? "",
+                  }}
+                  onSave={async (data) => {
+                    await saveFileData(projectId, editingFile.id, {
+                      name: data.name,
+                      tag: data.tag,
+                      params: { ...data.values, mode: data.mode, coordinates: data.coordinates ?? "", waypoints: data.waypoints ?? "" },
+                    });
+                    await loadFiles();
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        </div>{/* close flex row */}
       </main>
-
-      <footer className="border-t border-border bg-surface/80 backdrop-blur-sm h-10 flex items-center justify-between px-12">
-        <span className="text-[11px] text-muted">University of Southampton — EPE Research Group</span>
-        <span className="font-mono text-[11px] text-muted">2026</span>
-      </footer>
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDeleteFile}
-        mode="destructive"
-        name={deleteTarget?.name ?? ""}
-        itemType="file"
-      />
     </div>
-  );
-}
-
-interface FileCardProps {
-  file: ProjectFile;
-  canDelete: boolean;
-  onClick: () => void;
-  onDelete: () => void;
-}
-
-function FileCard({ file, canDelete, onClick, onDelete }: FileCardProps) {
-  const typeLabel = file.category === "cable"
-    ? (file.sub_type === "dc_bipole" ? "DC Bipole" : "HVAC")
-    : file.category === "wmm"
-      ? "WMM"
-      : "Bathymetry";
-
-  const dateStr = new Date(file.created_at).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-  });
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2 }}
-      onClick={onClick}
-      className="group relative bg-[#111] border border-[#222] hover:border-[#333] rounded-2xl p-4 transition-colors cursor-none"
-      data-magnetic
-    >
-      <div className="flex items-start gap-3">
-        <ProjectAvatar projectId={file.id} className="w-10 h-10 rounded-xl flex-shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-white truncate">{file.name}</p>
-          <p className="text-xs text-[#888]">
-            {typeLabel}
-            <span className="text-[#555]"> · {dateStr}</span>
-          </p>
-        </div>
-      </div>
-
-      {canDelete && (
-        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            data-magnetic
-            className="p-1.5 rounded-lg text-[#666] hover:text-error hover:bg-[#222] transition-colors cursor-none"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-    </motion.div>
   );
 }

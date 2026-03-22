@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide magnetic cursor dot when hovering over the map */
+body.hide-magnetic-cursor .magnetic-cursor {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 @layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
