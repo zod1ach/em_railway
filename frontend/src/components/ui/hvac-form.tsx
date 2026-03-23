@@ -2,38 +2,16 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { UnsavedChanges } from "@/components/ui/unsaved-changes";
+import {
+  HVAC_CORE_PARAMS,
+  HVAC_MAGNETIC_PARAMS,
+  type ParamDef,
+} from "@/lib/shared-param-defs";
 
-/* ── Parameter definitions ── */
-interface Param {
-  key: string;
-  label: string;
-  unit: string;
-  default: number;
-}
-
-const coreParams: Param[] = [
-  { key: "p_c", label: "Lay Length", unit: "m", default: 2.75 },
-  { key: "R_h", label: "Helix Radius", unit: "m", default: 0.060391 },
-  { key: "r_AC", label: "Cable Radius", unit: "m", default: 0.1225 },
-  { key: "d_s", label: "Sheath Diameter", unit: "m", default: 0.0958 },
-  { key: "R_s", label: "Sheath Resistance", unit: "Ω/m", default: 2398.15e-7 },
-  { key: "f", label: "Frequency", unit: "Hz", default: 50 },
-  { key: "I_AC", label: "Current", unit: "A", default: 1000 },
-  { key: "N_calc", label: "Harmonics", unit: "", default: 10 },
-  { key: "s", label: "Conductor Spacing", unit: "m", default: 0.0892 },
-];
-
-const magneticParams: Param[] = [
-  { key: "N", label: "Armour Wires", unit: "", default: 110 },
-  { key: "d_f", label: "Wire Diameter", unit: "m", default: 0.0056 },
-  { key: "d_A", label: "Armour Diameter", unit: "m", default: 0.2056 },
-  { key: "p_A", label: "Armour Pitch", unit: "m", default: 3.084 },
-  { key: "lay_factor", label: "Lay Factor", unit: "", default: -1 },
-  { key: "mu_r_real", label: "μr (Real)", unit: "", default: 100 },
-  { key: "mu_r_imag", label: "μr (Imag)", unit: "", default: -50 },
-  { key: "sigma", label: "Conductivity", unit: "S/m", default: 4.03e6 },
-  { key: "t", label: "Wire Thickness", unit: "m", default: 0.005 },
-];
+/* ── Parameter definitions (from shared source) ── */
+type Param = ParamDef & { default: number };
+const coreParams = HVAC_CORE_PARAMS as unknown as Param[];
+const magneticParams = HVAC_MAGNETIC_PARAMS as unknown as Param[];
 
 /* ── Toggle icon ── */
 function MagneticToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {

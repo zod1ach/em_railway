@@ -213,8 +213,8 @@ export function TreeView({
             {renderLabel ? renderLabel(node, isFolder) : node.label}
           </span>
 
-          {/* Add button for folders */}
-          {isFolder && onAddClick && (
+          {/* Add button for category folders only (not file nodes with batch children) */}
+          {isFolder && !node.data && onAddClick && (
             <div className="flex items-center gap-0.5 ml-16">
               <button
                 onClick={(e) => {
@@ -229,8 +229,8 @@ export function TreeView({
             </div>
           )}
 
-          {/* Actions for file nodes (e.g. delete) */}
-          {!isFolder && renderAfterNode && (
+          {/* Actions for non-folder nodes (files, batch folders — even if they have children) */}
+          {renderAfterNode && node.data && (
             <div className="flex items-center ml-16" onClick={(e) => e.stopPropagation()}>
               {renderAfterNode(node)}
             </div>

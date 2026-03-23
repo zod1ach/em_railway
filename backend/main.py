@@ -12,6 +12,7 @@ from api.wmm_geomag import router as wmm_router
 from api.cable_3d import router as cable_3d_router
 from api.local_projects import router as local_projects_router
 from api.project_files import router as project_files_router
+from api.batch_files import router as batch_files_router
 
 app = FastAPI(
     title="EM Calculator API",
@@ -37,6 +38,7 @@ app.include_router(wmm_router, prefix="/api/wmm", tags=["wmm"])
 app.include_router(cable_3d_router, prefix="/api/cable-3d", tags=["cable-3d"])
 app.include_router(project_files_router, prefix="/api/local-projects", tags=["project-files"])
 app.include_router(local_projects_router, prefix="/api/local-projects", tags=["local-projects"])
+app.include_router(batch_files_router, prefix="/api/local-projects", tags=["batch-files"])
 
 @app.get("/api/health")
 def health():

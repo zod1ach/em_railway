@@ -7,28 +7,16 @@ import { WMMMap, type LinePoint, type WMMMapHandle } from "@/components/ui/wmm-m
 import { CaptureButton } from "@/components/ui/capture-button";
 import { api } from "@/lib/api";
 
-/* ── Parameter definitions ── */
-interface Param {
-  key: string;
-  label: string;
-  unit: string;
-  default: number;
-}
+/* ── Parameter definitions (from shared source) ── */
+import {
+  DC_CABLE_PARAMS,
+  DC_EARTH_PARAMS,
+  type ParamDef,
+} from "@/lib/shared-param-defs";
 
-const cableParams: Param[] = [
-  { key: "r_DC", label: "Cable Radius", unit: "m", default: 0.06 },
-  { key: "cable_angle", label: "Cable Angle", unit: "°", default: 15.119 },
-  { key: "cable_slope", label: "Cable Slope", unit: "°", default: 0 },
-  { key: "I_DC", label: "Current", unit: "A", default: 1000 },
-];
-
-const earthParams: Param[] = [
-  { key: "B_earth_X", label: "B_earth X", unit: "nT", default: 9578 },
-  { key: "B_earth_Y", label: "B_earth Y", unit: "nT", default: 2588 },
-  { key: "B_earth_Z", label: "B_earth Z", unit: "nT", default: 53601 },
-  { key: "wmm_date", label: "Date", unit: "DD/MM/YYYY", default: "" as any },
-];
-
+type Param = ParamDef & { default: number | string };
+const cableParams = DC_CABLE_PARAMS as unknown as Param[];
+const earthParams = DC_EARTH_PARAMS as unknown as Param[];
 const allDcParams = [...cableParams, ...earthParams];
 
 /* ── Shared icons ── */
@@ -183,7 +171,10 @@ export function DCBipoleForm({ onClose, onSave, existingFile, readOnly = false }
 
   const invalidNumbers = useMemo(() => {
     const invalid: string[] = [];
-    allDcParams.forEach((p) => { if (values[p.key] && isNaN(Number(values[p.key]))) invalid.push(p.key); });
+    allDcParams.forEach((p) => {
+      if (p.unit === "DD/MM/YYYY") return; // Date validated by format, not as number
+      if (values[p.key] && isNaN(Number(values[p.key]))) invalid.push(p.key);
+    });
     return new Set(invalid);
   }, [values]);
 

@@ -30,6 +30,8 @@ class FileOut(BaseModel):
     name: str
     created_at: str
     updated_at: str
+    batch_folder_id: Optional[str] = None
+    batch_run_number: Optional[int] = None
 
 def init_project_files_table():
     with get_db() as conn:
@@ -56,6 +58,10 @@ def init_project_files_table():
             pass  # column already exists
 
 init_project_files_table()
+
+# Initialize batch tables (idempotent — safe on existing DBs)
+from .batch_init import init_batch_tables
+init_batch_tables()
 
 def _generate_name(conn: sqlite3.Connection, project_id: str, category: str, sub_type: Optional[str]) -> str:
     if category == "cable" and sub_type == "dc_bipole":
@@ -127,10 +133,11 @@ def create_file(project_id: str, body: FileCreate):
 
         name = _generate_name(conn, project_id, body.category, body.sub_type)
         file_id = conn.execute("SELECT lower(hex(randomblob(16)))").fetchone()[0]
+        now = conn.execute("SELECT datetime('now')").fetchone()[0]
         conn.execute(
-            """INSERT INTO project_files (id, project_id, category, sub_type, name)
-               VALUES (?, ?, ?, ?, ?)""",
-            (file_id, project_id, body.category, body.sub_type, name),
+            """INSERT INTO project_files (id, project_id, category, sub_type, name, file_data, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, '{}', ?, ?)""",
+            (file_id, project_id, body.category, body.sub_type, name, now, now),
         )
         conn.commit()
         row = conn.execute("SELECT * FROM project_files WHERE id = ?", (file_id,)).fetchone()
@@ -145,6 +152,19 @@ def delete_file(project_id: str, file_id: str):
         ).fetchone()
         if not row:
             raise HTTPException(404, "File not found")
+
+        # Cascade: delete batch folders under this file (and their child files)
+        batch_folders = conn.execute(
+            "SELECT id FROM batch_folders WHERE parent_file_id = ?",
+            (file_id,),
+        ).fetchall()
+        for bf in batch_folders:
+            # Delete batch child files first (they reference batch_folders via FK)
+            conn.execute("DELETE FROM batch_run_parameters WHERE batch_id = ?", (bf["id"],))
+            conn.execute("DELETE FROM project_files WHERE batch_folder_id = ?", (bf["id"],))
+            conn.execute("DELETE FROM batch_sweep_axes WHERE batch_id = ?", (bf["id"],))
+            conn.execute("DELETE FROM batch_folders WHERE id = ?", (bf["id"],))
+
         conn.execute("DELETE FROM project_files WHERE id = ?", (file_id,))
         conn.commit()
 
