@@ -22,6 +22,19 @@ export interface SweepRow {
   values: number[];   // computed discrete values
 }
 
+/* ── Location Mode State ── */
+
+export type DateSweepMode = "single" | "daily" | "monthly";
+
+export interface LocationState {
+  waypoints: { lat: number; lng: number }[];
+  numPoints: number;
+  dateSweepMode: DateSweepMode;
+  startDate: string;    // DD/MM/YYYY
+  endDate: string;      // DD/MM/YYYY (for daily mode)
+  numMonths: number;    // for monthly mode
+}
+
 /* ── Wizard State ── */
 
 export interface WizardState {
@@ -35,6 +48,7 @@ export interface WizardState {
   totalCombinations: number;
   isGenerating: boolean;
   error: string;
+  location: LocationState;
 }
 
 /* ── Actions ── */
@@ -55,7 +69,13 @@ export type WizardAction =
   | { type: "GO_TO_STEP"; step: 1 | 2 | 3 | 4 }
   | { type: "SET_GENERATING"; generating: boolean }
   | { type: "SET_ERROR"; error: string }
-  | { type: "INIT_SWEEP_ROWS"; params: ParamDef[] };
+  | { type: "INIT_SWEEP_ROWS"; params: ParamDef[] }
+  | { type: "SET_WAYPOINTS"; waypoints: { lat: number; lng: number }[] }
+  | { type: "SET_NUM_POINTS"; numPoints: number }
+  | { type: "SET_DATE_SWEEP_MODE"; mode: DateSweepMode }
+  | { type: "SET_START_DATE"; date: string }
+  | { type: "SET_END_DATE"; date: string }
+  | { type: "SET_NUM_MONTHS"; months: number };
 
 /* ── Initial State Factory ── */
 
@@ -74,6 +94,14 @@ export function createInitialState(
     totalCombinations: 0,
     isGenerating: false,
     error: "",
+    location: {
+      waypoints: [],
+      numPoints: 10,
+      dateSweepMode: "single",
+      startDate: "",
+      endDate: "",
+      numMonths: 1,
+    },
   };
 }
 
@@ -190,6 +218,42 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
     case "SET_ERROR":
       return { ...state, error: action.error };
 
+    case "SET_WAYPOINTS":
+      return recomputeLocationCombinations({
+        ...state,
+        location: { ...state.location, waypoints: action.waypoints },
+      });
+
+    case "SET_NUM_POINTS":
+      return recomputeLocationCombinations({
+        ...state,
+        location: { ...state.location, numPoints: Math.max(1, Math.min(action.numPoints, 500)) },
+      });
+
+    case "SET_DATE_SWEEP_MODE":
+      return recomputeLocationCombinations({
+        ...state,
+        location: { ...state.location, dateSweepMode: action.mode },
+      });
+
+    case "SET_START_DATE":
+      return recomputeLocationCombinations({
+        ...state,
+        location: { ...state.location, startDate: action.date },
+      });
+
+    case "SET_END_DATE":
+      return recomputeLocationCombinations({
+        ...state,
+        location: { ...state.location, endDate: action.date },
+      });
+
+    case "SET_NUM_MONTHS":
+      return recomputeLocationCombinations({
+        ...state,
+        location: { ...state.location, numMonths: Math.max(1, action.months) },
+      });
+
     default:
       return state;
   }
@@ -215,5 +279,40 @@ function recomputeCombinations(state: WizardState): WizardState {
   const enabled = state.sweepRows.filter((r) => r.enabled && r.values.length > 0);
   const valueSets = enabled.map((r) => r.values);
   const total = countCombinations(valueSets);
+  return { ...state, totalCombinations: total };
+}
+
+/** Parse DD/MM/YYYY to a Date object. Returns null if invalid. */
+function parseDDMMYYYY(s: string): Date | null {
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const d = new Date(+m[3], +m[2] - 1, +m[1]);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
+/** Count dates produced by the date sweep config. */
+export function countDates(loc: LocationState): number {
+  if (loc.dateSweepMode === "single") {
+    return loc.startDate ? 1 : 0;
+  }
+  if (loc.dateSweepMode === "daily") {
+    const start = parseDDMMYYYY(loc.startDate);
+    const end = parseDDMMYYYY(loc.endDate);
+    if (!start || !end || end < start) return 0;
+    const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return diff + 1; // inclusive
+  }
+  if (loc.dateSweepMode === "monthly") {
+    return loc.startDate ? Math.max(1, loc.numMonths) : 0;
+  }
+  return 0;
+}
+
+function recomputeLocationCombinations(state: WizardState): WizardState {
+  const loc = state.location;
+  if (loc.waypoints.length < 2) return { ...state, totalCombinations: 0 };
+  const numDates = countDates(loc);
+  const total = loc.numPoints * numDates;
   return { ...state, totalCombinations: total };
 }

@@ -13,6 +13,7 @@ import {
 import { BatchWizardStepName } from "./batch-wizard-step-name";
 import { BatchWizardStepType } from "./batch-wizard-step-type";
 import { BatchWizardStepSweeps } from "./batch-wizard-step-sweeps";
+import { BatchWizardStepLocation } from "./batch-wizard-step-location";
 import { BatchWizardStepReview } from "./batch-wizard-step-review";
 import { createBatch, type CreateBatchInput } from "@/lib/batch-files";
 import {
@@ -64,7 +65,10 @@ export function BatchWizard({ projectId, parentFile, parentFileData, onClose, on
     dispatch({ type: "SET_ERROR", error: "" });
 
     try {
-      const enabledSweeps = state.sweepRows.filter((r) => r.enabled && r.values.length > 0);
+      const isLocation = state.batchMode === "location";
+      const enabledSweeps = isLocation
+        ? []
+        : state.sweepRows.filter((r) => r.enabled && r.values.length > 0);
 
       const input: CreateBatchInput = {
         name: state.name,
@@ -81,6 +85,19 @@ export function BatchWizard({ projectId, parentFile, parentFileData, onClose, on
           step: s.mode === "range" ? parseFloat(s.step) : null,
           values: s.values,
         })),
+        ...(isLocation ? {
+          location_config: {
+            waypoints: state.location.waypoints,
+            total_points: state.location.numPoints,
+            interpolation: "linear" as const,
+            date_sweep: {
+              mode: state.location.dateSweepMode,
+              start_date: state.location.startDate,
+              end_date: state.location.endDate,
+              num_months: state.location.numMonths,
+            },
+          },
+        } : {}),
       };
 
       await createBatch(projectId, input);
@@ -166,12 +183,19 @@ export function BatchWizard({ projectId, parentFile, parentFileData, onClose, on
           )}
           {state.step === 3 && (
             <motion.div key="step3" {...stepAnimation}>
-              <BatchWizardStepSweeps
-                state={state}
-                dispatch={dispatch}
-                availableParams={availableParams}
-                baseValues={baseValues}
-              />
+              {state.batchMode === "location" ? (
+                <BatchWizardStepLocation
+                  state={state}
+                  dispatch={dispatch}
+                />
+              ) : (
+                <BatchWizardStepSweeps
+                  state={state}
+                  dispatch={dispatch}
+                  availableParams={availableParams}
+                  baseValues={baseValues}
+                />
+              )}
             </motion.div>
           )}
           {state.step === 4 && (

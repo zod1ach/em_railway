@@ -53,10 +53,18 @@ export interface SweepConfig {
   parameters: SweepParameter[];
 }
 
+export interface DateSweepConfig {
+  mode: "single" | "daily" | "monthly";
+  start_date: string;
+  end_date?: string;
+  num_months?: number;
+}
+
 export interface LocationConfig {
   waypoints: { lat: number; lng: number }[];
   total_points: number;
   interpolation: "linear" | "great_circle";
+  date_sweep?: DateSweepConfig;
 }
 
 export interface BatchFolder {

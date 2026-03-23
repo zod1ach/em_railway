@@ -107,7 +107,7 @@ export function BatchResultsTable({
                 <th
                   key={col.key}
                   onClick={() => onSort(col.key)}
-                  className="text-[#888] text-[11px] font-bold uppercase tracking-wider py-2 pr-4 cursor-none select-none"
+                  className="text-[#888] text-[11px] font-bold uppercase tracking-wider py-2 pr-4 cursor-none select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1">
                     {col.label} <span className="text-[#555] normal-case font-normal">({col.unit})</span>
@@ -120,7 +120,7 @@ export function BatchResultsTable({
                 <th
                   key={col.key}
                   onClick={() => onSort(col.key)}
-                  className="text-[#888] text-[11px] font-bold uppercase tracking-wider py-2 pr-4 cursor-none select-none"
+                  className="text-[#888] text-[11px] font-bold uppercase tracking-wider py-2 pr-4 cursor-none select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1">
                     {col.label} <span className="text-[#555] normal-case font-normal">({col.unit})</span>
@@ -160,15 +160,19 @@ export function BatchResultsTable({
                   {/* Param values */}
                   {paramCols.map((col) => (
                     <td key={col.key} className="text-white text-sm py-2 pr-4">
-                      {run.params[col.key] ?? "—"}
+                      {run.params[col.key] != null
+                        ? typeof run.params[col.key] === "number"
+                          ? Number(run.params[col.key]).toFixed(2)
+                          : run.params[col.key]
+                        : "—"}
                     </td>
                   ))}
                   {/* Calc values */}
                   <td className="text-white text-sm py-2 pr-4">
-                    {run.calc_peak_b_field != null ? run.calc_peak_b_field.toExponential(3) : "—"}
+                    {run.calc_peak_b_field != null ? Number(run.calc_peak_b_field).toFixed(2) : "—"}
                   </td>
                   <td className="text-white text-sm py-2 pr-4">
-                    {run.calc_peak_e_field != null ? run.calc_peak_e_field.toExponential(3) : "—"}
+                    {run.calc_peak_e_field != null ? Number(run.calc_peak_e_field).toFixed(2) : "—"}
                   </td>
                 </motion.tr>
               );

@@ -292,6 +292,22 @@ def create_batch(project_id: str, body: BatchCreate):
                                     body.cable_model_type, base_params,
                                     body.location_config.model_dump(),
                                     parent_data.get("magnetic", False))
+            # Insert sweep axes for location mode columns
+            loc_axes = [
+                ("lat", "Latitude", "°", 0),
+                ("lng", "Longitude", "°", 1),
+                ("B_EARTH_X", "B_EARTH X", "nT", 2),
+                ("B_EARTH_Y", "B_EARTH Y", "nT", 3),
+                ("B_EARTH_Z", "B_EARTH Z", "nT", 4),
+            ]
+            for key, label, unit, order in loc_axes:
+                conn.execute(
+                    """INSERT INTO batch_sweep_axes
+                       (batch_id, param_key, param_label, unit, min_val, max_val,
+                        step_val, values_json, sort_order)
+                       VALUES (?, ?, ?, ?, 0, 0, NULL, '[]', ?)""",
+                    (batch_id, key, label, unit, order),
+                )
         else:
             generate_batch_files(conn, batch_id, project_id, body.tag,
                                  body.cable_model_type, body.batch_mode,

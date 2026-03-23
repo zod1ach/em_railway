@@ -113,6 +113,24 @@ def generate_location_batch(
     # Interpolate points along the transect
     points = _interpolate_transect(waypoints, total_points, method)
 
+    # Parse date from base_params (DD/MM/YYYY → decimal year)
+    def _parse_date_decimal(date_str: str) -> float:
+        """Convert DD/MM/YYYY to decimal year for pygeomag."""
+        import re
+        m = re.match(r"(\d{2})/(\d{2})/(\d{4})", date_str)
+        if m:
+            day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            from datetime import date as dt_date
+            d = dt_date(year, month, day)
+            year_start = dt_date(year, 1, 1)
+            year_end = dt_date(year + 1, 1, 1)
+            fraction = (d - year_start).days / (year_end - year_start).days
+            return year + fraction
+        return 2025.0  # fallback
+
+    wmm_date_str = base_params.get("wmm_date", "")
+    wmm_decimal = _parse_date_decimal(wmm_date_str) if wmm_date_str else 2025.0
+
     # Single GeoMag instance for all lookups (performance)
     from pygeomag import GeoMag
     geo = GeoMag()
@@ -126,7 +144,7 @@ def generate_location_batch(
 
         # WMM lookup for earth field components
         try:
-            result = geo.calculate(glat=lat, glon=lng, alt=0, date=2025.0)
+            result = geo.calculate(glat=lat, glon=lng, alt=0, time=wmm_decimal, allow_date_outside_lifespan=True)
             b_earth_x = result.x
             b_earth_y = result.y
             b_earth_z = result.z
@@ -142,7 +160,13 @@ def generate_location_batch(
         params["B_earth_Y"] = str(b_earth_y)
         params["B_earth_Z"] = str(b_earth_z)
 
-        swept = {"lat": lat, "lng": lng}
+        swept = {
+            "lat": lat,
+            "lng": lng,
+            "B_EARTH_X": b_earth_x,
+            "B_EARTH_Y": b_earth_y,
+            "B_EARTH_Z": b_earth_z,
+        }
 
         run_name = f"Run {str(run_num).zfill(pad_width)}: lat={lat:.4f}, lng={lng:.4f}"
         run_tag = f"{batch_tag}/run{str(run_num).zfill(pad_width)}"

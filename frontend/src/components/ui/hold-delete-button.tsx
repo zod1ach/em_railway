@@ -3,7 +3,7 @@ import { Trash2, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface HoldDeleteButtonProps {
-  onDelete: () => void;
+  onDelete: () => void | Promise<void>;
   holdDuration?: number;
   disabled?: boolean;
   disabledMessage?: string;
@@ -50,14 +50,16 @@ export function HoldDeleteButton({
       if (pct >= 100) clearInterval(progressRef.current!);
     }, 30);
 
-    holdTimerRef.current = setTimeout(() => {
+    holdTimerRef.current = setTimeout(async () => {
       setState("deleting");
       setProgress(100);
-      onDelete();
-      setTimeout(() => {
-        setState("deleted");
-        setTimeout(() => setState("idle"), 2000);
-      }, 400);
+      try {
+        await onDelete();
+      } catch (err) {
+        console.error("Delete failed:", err);
+      }
+      setState("deleted");
+      setTimeout(() => setState("idle"), 2000);
     }, holdDuration);
   };
 

@@ -239,9 +239,11 @@ function BatchParamDisplay({
     return [...DC_CABLE_PARAMS, ...DC_EARTH_PARAMS];
   }, [batchFolder.cable_model_type, batchFolder.batch_mode]);
 
+  const isLocation = batchFolder.batch_mode === "location";
   const sweptKeys = new Set(sweepAxes.map((a) => a.key));
-  const fixedParams = allParams.filter((p) => !sweptKeys.has(p.key));
-  const sweepParams = allParams.filter((p) => sweptKeys.has(p.key));
+  // In location mode, all cable/earth params are fixed
+  const fixedParams = isLocation ? allParams : allParams.filter((p) => !sweptKeys.has(p.key));
+  const sweepParams = isLocation ? [] : allParams.filter((p) => sweptKeys.has(p.key));
 
   // Parse base_params (might be JSON string)
   const params: Record<string, string> = useMemo(() => {
@@ -291,8 +293,8 @@ function BatchParamDisplay({
         </span>
       </div>
 
-      {/* Sweep parameters */}
-      {sweepRows.length > 0 && (
+      {/* Sweep parameters (cable mode) */}
+      {!isLocation && sweepRows.length > 0 && (
         <div className="space-y-4">
           {sweepRows.map((row, ri) => (
             <div key={ri} className="grid grid-cols-3 gap-4">
@@ -315,6 +317,9 @@ function BatchParamDisplay({
         </div>
       )}
 
+      {/* Sweep info (location mode) */}
+      {isLocation && <LocationSweepInfo batchFolder={batchFolder} />}
+
       {/* Show/Close Data button */}
       <div className="flex justify-end mt-4">
         <CaptureButton
@@ -326,6 +331,47 @@ function BatchParamDisplay({
           minDuration={0}
         />
       </div>
+    </div>
+  );
+}
+
+/* ── Location sweep info for batch explorer ── */
+
+function LocationSweepInfo({ batchFolder }: { batchFolder: BatchFolder }) {
+  const locConfig = useMemo(() => {
+    if (!batchFolder.location_config) return null;
+    if (typeof batchFolder.location_config === "string") {
+      try { return JSON.parse(batchFolder.location_config); } catch { return null; }
+    }
+    return batchFolder.location_config;
+  }, [batchFolder.location_config]);
+
+  if (!locConfig) return null;
+
+  const waypoints = locConfig.waypoints ?? [];
+  const totalPoints = locConfig.total_points ?? 0;
+  const dateSweep = locConfig.date_sweep;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        <SweepField label="Waypoints" value={String(waypoints.length)} unit="points" />
+        <SweepField label="Interpolated" value={String(totalPoints)} unit="points" />
+        {dateSweep && (
+          <SweepField label="Date Mode" value={dateSweep.mode?.toUpperCase() ?? "SINGLE"} unit="" />
+        )}
+      </div>
+      {dateSweep && (
+        <div className="grid grid-cols-3 gap-4">
+          <SweepField label="Start Date" value={dateSweep.start_date ?? "—"} unit="" />
+          {dateSweep.mode === "daily" && (
+            <SweepField label="End Date" value={dateSweep.end_date ?? "—"} unit="" />
+          )}
+          {dateSweep.mode === "monthly" && (
+            <SweepField label="Months" value={String(dateSweep.num_months ?? 1)} unit="" />
+          )}
+        </div>
+      )}
     </div>
   );
 }
