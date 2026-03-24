@@ -48,10 +48,25 @@ class SweepParameterIn(BaseModel):
         return v
 
 
+class DateSweepIn(BaseModel):
+    mode: str = "single"   # "single" | "daily" | "monthly"
+    start_date: str = ""   # DD/MM/YYYY
+    end_date: str = ""     # DD/MM/YYYY (daily mode)
+    num_months: int = 1    # monthly mode
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        if v not in ("single", "daily", "monthly"):
+            raise ValueError("date sweep mode must be 'single', 'daily', or 'monthly'")
+        return v
+
+
 class LocationConfigIn(BaseModel):
     waypoints: list[dict[str, float]] = Field(min_length=2, max_length=100)
     total_points: int = Field(ge=1, le=500)
     interpolation: str = "linear"
+    date_sweep: Optional[DateSweepIn] = None
 
     @field_validator("interpolation")
     @classmethod
@@ -227,7 +242,12 @@ def create_batch(project_id: str, body: BatchCreate):
 
         # Calculate total combinations
         if body.batch_mode == "location" and body.location_config:
-            total_runs = body.location_config.total_points
+            from .batch_generation import expand_dates
+            dates = expand_dates(
+                body.location_config.date_sweep.model_dump()
+                if body.location_config.date_sweep else None
+            )
+            total_runs = body.location_config.total_points * len(dates)
         else:
             total_runs = 1
             for sp in body.sweep_parameters:
@@ -296,9 +316,10 @@ def create_batch(project_id: str, body: BatchCreate):
             loc_axes = [
                 ("lat", "Latitude", "°", 0),
                 ("lng", "Longitude", "°", 1),
-                ("B_EARTH_X", "B_EARTH X", "nT", 2),
-                ("B_EARTH_Y", "B_EARTH Y", "nT", 3),
-                ("B_EARTH_Z", "B_EARTH Z", "nT", 4),
+                ("wmm_date", "WMM Date", "", 2),
+                ("B_EARTH_X", "B_EARTH X", "nT", 3),
+                ("B_EARTH_Y", "B_EARTH Y", "nT", 4),
+                ("B_EARTH_Z", "B_EARTH Z", "nT", 5),
             ]
             for key, label, unit, order in loc_axes:
                 conn.execute(

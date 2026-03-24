@@ -8,10 +8,83 @@ import json
 import sqlite3
 import math
 import uuid
-from datetime import datetime, timezone
+import re
+import calendar
+from datetime import datetime, timezone, date, timedelta
 import numpy as np
 from itertools import product as cartesian_product
 from typing import Any
+
+
+def _parse_ddmmyyyy(s: str) -> date | None:
+    """Parse DD/MM/YYYY to a date object."""
+    m = re.match(r"(\d{2})/(\d{2})/(\d{4})", s)
+    if not m:
+        return None
+    try:
+        return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+    except ValueError:
+        return None
+
+
+def _days_in_month(year: int, month: int) -> int:
+    """Return number of days in a given month."""
+    return calendar.monthrange(year, month)[1]
+
+
+def _date_str_to_decimal(date_str: str) -> float | None:
+    """Convert DD/MM/YYYY to decimal year for pygeomag."""
+    d = _parse_ddmmyyyy(date_str)
+    if not d:
+        return None
+    year_start = date(d.year, 1, 1)
+    year_end = date(d.year + 1, 1, 1)
+    fraction = (d - year_start).days / (year_end - year_start).days
+    return d.year + fraction
+
+
+def expand_dates(date_sweep: dict[str, Any] | None) -> list[str]:
+    """Expand date sweep config into a list of DD/MM/YYYY date strings."""
+    if not date_sweep:
+        return [""]
+
+    mode = date_sweep.get("mode", "single")
+    start_str = date_sweep.get("start_date", "")
+
+    if not start_str:
+        return [""]
+
+    start = _parse_ddmmyyyy(start_str)
+    if not start:
+        return [start_str]
+
+    if mode == "single":
+        return [start_str]
+
+    if mode == "daily":
+        end_str = date_sweep.get("end_date", "")
+        end = _parse_ddmmyyyy(end_str)
+        if not end or end < start:
+            return [start_str]
+        dates = []
+        current = start
+        while current <= end:
+            dates.append(current.strftime("%d/%m/%Y"))
+            current += timedelta(days=1)
+        return dates
+
+    if mode == "monthly":
+        num_months = max(1, date_sweep.get("num_months", 1))
+        dates = []
+        for i in range(num_months):
+            year = start.year + (start.month - 1 + i) // 12
+            month = (start.month - 1 + i) % 12 + 1
+            day = min(start.day, _days_in_month(year, month))
+            d = date(year, month, day)
+            dates.append(d.strftime("%d/%m/%Y"))
+        return dates
+
+    return [start_str]
 
 
 def generate_batch_files(
@@ -102,7 +175,7 @@ def generate_location_batch(
     location_config: dict[str, Any],
     is_magnetic: bool = False,
 ):
-    """Generate files along a transect line with WMM lookups at each point."""
+    """Generate files along a transect line with WMM lookups at each point × date."""
     waypoints = location_config.get("waypoints", [])
     total_points = location_config.get("total_points", 10)
     method = location_config.get("interpolation", "linear")
@@ -113,81 +186,81 @@ def generate_location_batch(
     # Interpolate points along the transect
     points = _interpolate_transect(waypoints, total_points, method)
 
-    # Parse date from base_params (DD/MM/YYYY → decimal year)
-    def _parse_date_decimal(date_str: str) -> float:
-        """Convert DD/MM/YYYY to decimal year for pygeomag."""
-        import re
-        m = re.match(r"(\d{2})/(\d{2})/(\d{4})", date_str)
-        if m:
-            day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
-            from datetime import date as dt_date
-            d = dt_date(year, month, day)
-            year_start = dt_date(year, 1, 1)
-            year_end = dt_date(year + 1, 1, 1)
-            fraction = (d - year_start).days / (year_end - year_start).days
-            return year + fraction
-        return 2025.0  # fallback
-
-    wmm_date_str = base_params.get("wmm_date", "")
-    wmm_decimal = _parse_date_decimal(wmm_date_str) if wmm_date_str else 2025.0
+    # Expand dates from sweep config
+    date_sweep = location_config.get("date_sweep", None)
+    dates = expand_dates(date_sweep)
+    multi_date = len(dates) > 1
 
     # Single GeoMag instance for all lookups (performance)
     from pygeomag import GeoMag
     geo = GeoMag()
 
-    pad_width = max(3, len(str(len(points))))
+    total = len(points) * len(dates)
+    pad_width = max(3, len(str(total)))
     file_rows = []
     param_rows = []
 
-    for run_num, point in enumerate(points, 1):
-        lat, lng = point["lat"], point["lng"]
+    run_num = 0
+    for wmm_date_str in dates:
+        # Compute decimal year for this date
+        wmm_decimal = _date_str_to_decimal(wmm_date_str) if wmm_date_str else None
+        if wmm_decimal is None:
+            # Fallback: use wmm_date from base_params
+            wmm_decimal = _date_str_to_decimal(base_params.get("wmm_date", "")) or 2025.0
 
-        # WMM lookup for earth field components
-        try:
-            result = geo.calculate(glat=lat, glon=lng, alt=0, time=wmm_decimal, allow_date_outside_lifespan=True)
-            b_earth_x = result.x
-            b_earth_y = result.y
-            b_earth_z = result.z
-        except Exception:
-            # Fallback to default values if WMM lookup fails
-            b_earth_x = 9578.0
-            b_earth_y = 2588.0
-            b_earth_z = 53601.0
+        for point in points:
+            run_num += 1
+            lat, lng = point["lat"], point["lng"]
 
-        # Build param set with WMM overrides
-        params = {**base_params}
-        params["B_earth_X"] = str(b_earth_x)
-        params["B_earth_Y"] = str(b_earth_y)
-        params["B_earth_Z"] = str(b_earth_z)
+            # WMM lookup for earth field components
+            try:
+                result = geo.calculate(
+                    glat=lat, glon=lng, alt=0, time=wmm_decimal,
+                    allow_date_outside_lifespan=True,
+                )
+                b_earth_x, b_earth_y, b_earth_z = result.x, result.y, result.z
+            except Exception:
+                b_earth_x, b_earth_y, b_earth_z = 9578.0, 2588.0, 53601.0
 
-        swept = {
-            "lat": lat,
-            "lng": lng,
-            "B_EARTH_X": b_earth_x,
-            "B_EARTH_Y": b_earth_y,
-            "B_EARTH_Z": b_earth_z,
-        }
+            # Build param set with WMM overrides
+            params = {**base_params}
+            params["B_earth_X"] = str(b_earth_x)
+            params["B_earth_Y"] = str(b_earth_y)
+            params["B_earth_Z"] = str(b_earth_z)
+            effective_date = wmm_date_str if wmm_date_str else base_params.get("wmm_date", "")
+            if effective_date:
+                params["wmm_date"] = effective_date
 
-        run_name = f"Run {str(run_num).zfill(pad_width)}: lat={lat:.4f}, lng={lng:.4f}"
-        run_tag = f"{batch_tag}/run{str(run_num).zfill(pad_width)}"
+            swept = {
+                "lat": lat,
+                "lng": lng,
+                "wmm_date": effective_date,
+                "B_EARTH_X": b_earth_x,
+                "B_EARTH_Y": b_earth_y,
+                "B_EARTH_Z": b_earth_z,
+            }
 
-        file_data = json.dumps({
-            "name": run_name,
-            "tag": run_tag,
-            "magnetic": is_magnetic,
-            "params": params,
-        })
+            date_label = f"{effective_date}, " if multi_date else ""
+            run_name = f"Run {str(run_num).zfill(pad_width)}: {date_label}lat={lat:.4f}, lng={lng:.4f}"
+            run_tag = f"{batch_tag}/run{str(run_num).zfill(pad_width)}"
 
-        file_id = uuid.uuid4().hex
-        now = datetime.now(timezone.utc).isoformat()
+            file_data = json.dumps({
+                "name": run_name,
+                "tag": run_tag,
+                "magnetic": is_magnetic,
+                "params": params,
+            })
 
-        file_rows.append((
-            file_id, project_id, "cable", cable_model_type,
-            run_name, file_data, batch_id, run_num, now, now,
-        ))
+            file_id = uuid.uuid4().hex
+            now = datetime.now(timezone.utc).isoformat()
 
-        for key, value in swept.items():
-            param_rows.append((file_id, batch_id, key, value))
+            file_rows.append((
+                file_id, project_id, "cable", cable_model_type,
+                run_name, file_data, batch_id, run_num, now, now,
+            ))
+
+            for key, value in swept.items():
+                param_rows.append((file_id, batch_id, key, value))
 
     # Bulk insert
     conn.executemany(

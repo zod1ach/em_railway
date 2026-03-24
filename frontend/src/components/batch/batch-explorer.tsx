@@ -28,6 +28,7 @@ interface BatchExplorerProps {
   parentFile: ProjectFile;
   onClose: () => void;
   onFileOpen: (fileId: string) => void;
+  onLoadToFlow?: (selectedFiles: ProjectFile[], mode: "batch" | "individual") => void;
 }
 
 export function BatchExplorer({
@@ -36,6 +37,7 @@ export function BatchExplorer({
   parentFile,
   onClose,
   onFileOpen,
+  onLoadToFlow,
 }: BatchExplorerProps) {
   const { batch, sweepAxes, allRuns, loading, error } = useBatchData(
     projectId,
@@ -177,8 +179,17 @@ export function BatchExplorer({
             {/* Action bar */}
             <BatchActionBar
               selectedCount={selectedIds.size}
-              onLoadToFlow={() => {
-                /* TODO: flow loading — future N8N integration */
+              onLoadToFlow={(mode) => {
+                if (!onLoadToFlow) return;
+                const selectedFiles = allRuns
+                  .filter((r) => selectedIds.has(r.file_id))
+                  .map((r) => ({
+                    id: r.file_id,
+                    name: r.file_name ?? `Run ${r.file_id.slice(0, 6)}`,
+                    category: parentFile.category,
+                    sub_type: parentFile.sub_type,
+                  } as ProjectFile));
+                onLoadToFlow(selectedFiles, mode);
               }}
             />
           </motion.div>

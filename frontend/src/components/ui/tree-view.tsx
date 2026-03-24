@@ -241,14 +241,13 @@ export function TreeView({
         <AnimatePresence>
           {hasChildren && isExpanded && (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
+              initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+              animate={{ height: "auto", opacity: 1, overflow: "visible" }}
+              exit={{ height: 0, opacity: 0, overflow: "hidden" }}
               transition={{
                 duration: animateExpand ? 0.3 : 0,
                 ease: "easeInOut",
               }}
-              className="overflow-hidden"
             >
               <motion.div
                 initial={{ y: -10 }}
